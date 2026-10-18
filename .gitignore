@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+dist/
+backend/data/*.db
+backend/app/ml/artifacts/*.joblib
+backend/app/ml/artifacts/*.json
+backend/app/ml/artifacts/*.md
+!backend/app/ml/artifacts/.gitkeep
+.env
+.venv/
+venv/
+docs/figures/*.png
+docs/screenshots/*.png

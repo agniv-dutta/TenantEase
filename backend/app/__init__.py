@@ -1,0 +1,1 @@
+"""TenantEase Khata backend package."""

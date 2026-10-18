@@ -1,0 +1,167 @@
+/* Khata design tokens. Every colour, font, radius, shadow and type size in the
+   app comes from this file. Do not introduce values anywhere else. */
+
+:root {
+  /* Palette: limewashed wall, indigo ink, stamp-pad inks, turmeric */
+  --chuna: #E8ECE5;
+  --paper: #F5F7F2;
+  --chuna-deep: #D8DED3;
+  --rule: #B7C0D6;
+  --indigo: #1E2A5E;
+  --indigo-soft: #4B5788;
+  --stamp-red: #B3202A;
+  --verdigris: #2A7566;
+  --haldi: #E2A200;
+
+  /* Scrim behind the drawer, indigo at low opacity */
+  --scrim: rgba(30, 42, 94, 0.18);
+
+  /* Radii: 0 on ledger and rules, 2px on inputs and buttons */
+  --r-0: 0;
+  --r-1: 2px;
+
+  /* Spacing on a 4px base */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --row-h: 44px;
+
+  /* Type scale (size / line height) */
+  --fs-small: 13px;
+  --lh-small: 18px;
+  --fs-body: 16px;
+  --lh-body: 26px;
+  --fs-sub: 20px;
+  --lh-sub: 28px;
+  --fs-section: 30px;
+  --lh-section: 36px;
+  --fs-page: 48px;
+  --lh-page: 52px;
+
+  --font-display: "Yatra One", "Mukta", sans-serif;
+  --font-body: "Mukta", "Noto Sans Devanagari", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--chuna);
+  color: var(--indigo);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  margin: 0;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-page);
+  line-height: var(--lh-page);
+  font-weight: 400;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: 400;
+}
+
+.subhead {
+  font-size: var(--fs-sub);
+  line-height: var(--lh-sub);
+  font-weight: 600;
+}
+
+small,
+.small {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.soft {
+  color: var(--indigo-soft);
+}
+
+p {
+  max-width: 68ch;
+  margin: 0 0 var(--s-3);
+}
+
+a {
+  color: var(--indigo);
+}
+
+:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  color: var(--indigo);
+  border-radius: var(--r-1);
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  padding: var(--s-1) var(--s-2);
+}
+
+button {
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--indigo);
+  color: var(--paper);
+  border-color: var(--indigo);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: var(--s-4) 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
