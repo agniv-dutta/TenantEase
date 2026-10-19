@@ -1,11 +1,12 @@
 /** Tenant drawer: history, a plain-language explanation of the score, the
  *  reminder plan, and the reminder draft with guardrails and approval. */
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { api, ApiError } from "../lib/api";
-import { formatINR, formatDate, percent, weekdayDate } from "../lib/format";
-import { useTenant } from "../lib/queries";
+import { formatINR, formatDate, weekdayDate } from "../lib/format";
+import { useMaintenance, useTenant } from "../lib/queries";
 import type { Guardrail, Reminder } from "../lib/types";
 import RiskStroke from "./RiskStroke";
 import Stamp from "./Stamp";
@@ -29,6 +30,8 @@ interface TenantDrawerProps {
 
 export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
   const { data, isLoading, error } = useTenant(leaseId);
+  const { data: requests } = useMaintenance(leaseId);
+  const queryClient = useQueryClient();
   const [language, setLanguage] = useState("en");
   const [tone, setTone] = useState("friendly");
   const [reminder, setReminder] = useState<Reminder | null>(null);
@@ -36,6 +39,8 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
   const [guardrails, setGuardrails] = useState<Guardrail[]>([]);
   const [edited, setEdited] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [requestText, setRequestText] = useState("");
+  const [requestBusy, setRequestBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,6 +107,26 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
     }
   }
 
+  async function handleAddRequest() {
+    const text = requestText.trim();
+    if (!text) return;
+    setRequestBusy(true);
+    try {
+      const created = await api.createMaintenance(leaseId, text);
+      setRequestText("");
+      await queryClient.invalidateQueries({ queryKey: ["maintenance", leaseId] });
+      setToast(
+        created.urgency === "emergency"
+          ? "Emergency logged. Call the tenant now and dispatch the trade."
+          : "Request logged.",
+      );
+    } catch (e) {
+      setToast(e instanceof ApiError ? e.message : "Could not add the request.");
+    } finally {
+      setRequestBusy(false);
+    }
+  }
+
   async function handleApprove() {
     if (!reminder) return;
     setBusy(true);
@@ -155,19 +180,13 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
         <>
           <hr className="rule" />
           <h3 className="subhead">Why this score</h3>
-          <p>
-            <RiskStroke probability={data.probability} tier={data.tier} seed={`d-${leaseId}`} /> chance this
-            cycle is paid late.
+          <p className="score-line">
+            <RiskStroke probability={data.probability} tier={data.tier} seed={`d-${leaseId}`} />
+            <span>chance this cycle is paid late.</span>
           </p>
-          {data.factors.slice(0, 3).map((f) => (
+          {data.top_factors.slice(0, 3).map((f) => (
             <div className="factor" key={f.feature}>
-              <div>
-                {f.template_value} — {f.direction === "raises" ? "raises" : "lowers"} the late risk
-              </div>
-              <div className="dir">
-                {f.direction === "raises" ? "raises" : "lowers"} · weight{" "}
-                <span className="num">{percent(Math.min(1, Math.abs(f.contribution)))}</span>
-              </div>
+              {f.sentence} — {f.direction} the risk, {f.strength} factor
             </div>
           ))}
           <p className="small soft">
@@ -239,6 +258,46 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
             {approved && <Stamp kind="approved" seed={`a-${reminder.id}`} animateIn />}
           </div>
         </>
+      )}
+
+      <hr className="rule" />
+      <h3 className="subhead">Maintenance</h3>
+      <label className="field">
+        New request
+        <textarea
+          value={requestText}
+          onChange={(e) => setRequestText(e.target.value)}
+          placeholder="Describe the issue in a few words"
+          aria-label="New maintenance request"
+        />
+      </label>
+      <div className="controls">
+        <button
+          className="primary"
+          onClick={handleAddRequest}
+          disabled={requestBusy || !requestText.trim()}
+        >
+          Add request
+        </button>
+        <span className="small soft">
+          Each request is sorted by trade and urgency. Safety issues always come first.
+        </span>
+      </div>
+      {requests && requests.length > 0 && (
+        <ul className="request-list">
+          {requests.map((r) => (
+            <li className="request-item" key={r.id}>
+              <span className="request-head">
+                <span className={`chip chip-${r.urgency}`}>{r.urgency}</span>
+                <span>{r.summary}</span>
+              </span>
+              <span className="small soft">
+                {r.category} · {r.suggested_trade}
+                {r.forced_emergency ? " · flagged by the safety rule" : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
 
       {toast && <div className="toast">{toast}</div>}

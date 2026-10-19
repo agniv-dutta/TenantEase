@@ -31,7 +31,9 @@ flowchart LR
 
 - **Backend** (`backend/`): FastAPI, SQLModel/SQLite, pandas, scikit-learn,
   LightGBM, SHAP. Synthetic data, feature pipeline, model, evaluation, reminder
-  planner and LLM drafter.
+  planner, LLM drafter, and a maintenance triage module (keyword fallback,
+  JSON-validated LLM path, and a hard safety rule that forces gas smell, sparks,
+  fire, flooding or structural cracks to emergency).
 - **Frontend** (`frontend/`): Vite + React + TypeScript. Plain CSS driven only by
   `src/styles/tokens.css`. Hand-built SVG for the stamps, the risk stroke and the
   charts. No UI kit, no chart library, no Tailwind.
@@ -42,7 +44,7 @@ flowchart LR
 make setup     # install backend and frontend dependencies
 make seed      # generate the synthetic SQLite database
 make train     # build features and train the model
-make eval      # write metrics, slices, model card, llm eval
+make eval      # write metrics, slices, model card, llm eval, triage eval
 make report-assets   # figures into docs/figures, docs/eval_report.md
 ```
 
@@ -101,6 +103,8 @@ not a forecast of production accuracy.
 7. Open Outlook and move the two follow-up sliders (the label stays
    "Assumption-based, not measured").
 8. Open Model notes and read "What this does not show".
+9. In the same drawer, add a maintenance request such as "gas leak smell in the
+   kitchen" and watch the safety rule escalate it to emergency.
 
 Screenshots for each page at 1440px and 390px live in `docs/screenshots`.
 

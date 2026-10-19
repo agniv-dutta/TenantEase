@@ -105,6 +105,12 @@ Label: assumption-based, not measured. These are assumption-based projections wi
 | script | 0.978 | 88 | 2 |
 | digits | 1.000 | 90 | 0 |
 
+## Maintenance triage
+
+60 labelled complaints. Category accuracy 1.000, urgency accuracy 1.000.
+
+Emergency recall 1.000 over 12 emergencies; emergency precision 1.000. Gas smell, sparks, fire, flooding and structural cracks are always forced to emergency, so recall does not depend on the model.
+
 ## Limitations and failure modes
 
 - Synthetic data with planted effects; do not read these as production accuracy.
@@ -112,6 +118,7 @@ Label: assumption-based, not measured. These are assumption-based projections wi
 - Isotonic calibration trades ranking (PR-AUC) for probability quality (Brier, ECE).
 - The simulation is assumption-based; it does not measure behaviour change.
 - Reminder messages are drafts; a human approves every one before it is sent.
+- Maintenance triage is keyword/LLM assisted; an emergency is always escalated but a human still dispatches the trade.
 
 ## Figures
 
@@ -123,3 +130,4 @@ Label: assumption-based, not measured. These are assumption-based projections wi
 - ![06_slices_recall_fpr](figures/06_slices_recall_fpr.png)
 - ![07_sensitivity_heatmap](figures/07_sensitivity_heatmap.png)
 - ![08_guardrail_pass_rates](figures/08_guardrail_pass_rates.png)
+- ![09_triage_scores](figures/09_triage_scores.png)

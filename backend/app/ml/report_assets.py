@@ -94,6 +94,7 @@ def load_artifacts(artifacts_dir: Path = ARTIFACTS) -> dict[str, Any]:
         "simulation": read_json("simulation.json"),
         "shap": read_json("shap_top_features.json"),
         "llm_eval": read_json("llm_eval.json"),
+        "triage_eval": read_json("triage_eval.json"),
         "preds": preds,
     }
 
@@ -273,6 +274,25 @@ def fig_guardrails(llm_eval: dict, figures_dir: Path) -> Path:
     return _save(fig, figures_dir, "08_guardrail_pass_rates.png")
 
 
+def fig_triage(triage_eval: dict, figures_dir: Path) -> Path:
+    """9. Triage accuracy and the emergency-recall number."""
+    labels = [
+        ("category\naccuracy", triage_eval["category_accuracy"], INDIGO),
+        ("urgency\naccuracy", triage_eval["urgency_accuracy"], INDIGO_SOFT),
+        ("emergency\nrecall", triage_eval["emergency_recall"], STAMP_RED),
+        ("emergency\nprecision", triage_eval["emergency_precision"], VERDIGRIS),
+    ]
+    fig, ax = plt.subplots(figsize=(6.5, 3.8))
+    ax.bar([item[0] for item in labels], [item[1] for item in labels], color=[item[2] for item in labels])
+    ax.set_ylim(0, 1.08)
+    ax.set_ylabel("Score")
+    ax.set_title(f"Maintenance triage over {triage_eval['n']} labelled complaints")
+    for i, (_, value, _) in enumerate(labels):
+        ax.text(i, value + 0.02, f"{value:.2f}", ha="center", color=INDIGO, fontsize=9)
+    _clean(ax)
+    return _save(fig, figures_dir, "09_triage_scores.png")
+
+
 def render_eval_report(arts: dict[str, Any]) -> str:
     """Assemble docs/eval_report.md from the artifacts, no hand-typed numbers."""
     metrics = arts["metrics"]
@@ -366,6 +386,23 @@ def render_eval_report(arts: dict[str, Any]) -> str:
         for name, r in llm_eval["guardrails"].items():
             lines.append(f"| {name} | {r['pass_rate']:.3f} | {r['passed']} | {r['failed']} |")
         lines.append("")
+    triage_eval = arts.get("triage_eval")
+    if triage_eval:
+        lines.append("## Maintenance triage")
+        lines.append("")
+        lines.append(
+            f"{triage_eval['n']} labelled complaints. Category accuracy "
+            f"{triage_eval['category_accuracy']:.3f}, urgency accuracy "
+            f"{triage_eval['urgency_accuracy']:.3f}."
+        )
+        lines.append("")
+        lines.append(
+            f"Emergency recall {triage_eval['emergency_recall']:.3f} over "
+            f"{triage_eval['emergency_support']} emergencies; emergency precision "
+            f"{triage_eval['emergency_precision']:.3f}. Gas smell, sparks, fire, flooding and "
+            "structural cracks are always forced to emergency, so recall does not depend on the model."
+        )
+        lines.append("")
     lines.append("## Limitations and failure modes")
     lines.append("")
     lines.append("- Synthetic data with planted effects; do not read these as production accuracy.")
@@ -373,10 +410,12 @@ def render_eval_report(arts: dict[str, Any]) -> str:
     lines.append("- Isotonic calibration trades ranking (PR-AUC) for probability quality (Brier, ECE).")
     lines.append("- The simulation is assumption-based; it does not measure behaviour change.")
     lines.append("- Reminder messages are drafts; a human approves every one before it is sent.")
+    lines.append("- Maintenance triage is keyword/LLM assisted; an emergency is always escalated but a "
+                 "human still dispatches the trade.")
     lines.append("")
     lines.append("## Figures")
     lines.append("")
-    for n in range(1, 9):
+    for n in range(1, 10):
         matches = sorted((DOCS / "figures").glob(f"{n:02d}_*.png"))
         for m in matches:
             lines.append(f"- ![{m.stem}](figures/{m.name})")
@@ -404,6 +443,8 @@ def main(figures_dir: Path = FIGURES, report_path: Path | None = None) -> list[P
         written.append(fig_sensitivity(arts["simulation"], figures_dir))
     if arts["llm_eval"]:
         written.append(fig_guardrails(arts["llm_eval"], figures_dir))
+    if arts["triage_eval"]:
+        written.append(fig_triage(arts["triage_eval"], figures_dir))
 
     report = report_path or (DOCS / "eval_report.md")
     report.parent.mkdir(parents=True, exist_ok=True)

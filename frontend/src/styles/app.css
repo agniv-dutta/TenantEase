@@ -230,9 +230,11 @@
   margin: var(--s-2) 0;
 }
 
-.factor .dir {
-  font-size: var(--fs-small);
-  color: var(--indigo-soft);
+.score-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
 }
 
 .history-strip {
@@ -273,6 +275,61 @@
 .guardrail-list li {
   padding: var(--s-1) 0;
   border-bottom: 1px solid var(--rule);
+}
+
+/* Maintenance requests */
+.field {
+  display: block;
+  margin: var(--s-3) 0;
+  font-size: var(--fs-small);
+}
+
+.field textarea {
+  min-height: 72px;
+  margin-top: var(--s-1);
+}
+
+.request-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--s-2) 0;
+}
+
+.request-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.request-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+
+.chip {
+  border: 1px solid var(--indigo);
+  border-radius: var(--r-1);
+  padding: 0 var(--s-1);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+.chip-emergency {
+  border-color: var(--stamp-red);
+  color: var(--stamp-red);
+}
+
+.chip-soon {
+  border-color: var(--haldi);
+  color: var(--indigo);
+}
+
+.chip-routine {
+  border-color: var(--verdigris);
+  color: var(--verdigris);
 }
 
 textarea {

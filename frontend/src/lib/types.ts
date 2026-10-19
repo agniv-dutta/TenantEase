@@ -53,11 +53,13 @@ export interface PortfolioSummary {
   cycle_month: string;
 }
 
+export type FactorStrength = "main" | "moderate" | "minor";
+
 export interface Factor {
   feature: string;
-  template_value: string;
+  sentence: string;
   direction: "raises" | "lowers";
-  contribution: number;
+  strength: FactorStrength;
 }
 
 export interface PlanStep {
@@ -105,10 +107,25 @@ export interface TenantDetail {
   history: PaymentCell[];
   probability: number | null;
   tier: Tier | null;
-  factors: Factor[];
+  top_factors: Factor[];
   plan: PlanStep[];
   reminders: Reminder[];
   cold_start: boolean;
+}
+
+export type Urgency = "emergency" | "soon" | "routine";
+
+export interface MaintenanceRequest {
+  id: number;
+  lease_id: number;
+  text: string;
+  category: string;
+  urgency: Urgency;
+  suggested_trade: string;
+  summary: string;
+  method: string;
+  forced_emergency: boolean;
+  created_at: string;
 }
 
 export interface OutlookPoint {

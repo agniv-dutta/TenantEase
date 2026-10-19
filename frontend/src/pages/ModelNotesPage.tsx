@@ -70,8 +70,8 @@ function CalibrationPlot({ model }: { model: ModelMetrics }) {
       <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="var(--indigo)" />
       <line x1={pad} y1={pad} x2={pad} y2={H - pad} stroke="var(--indigo)" />
       <path d={line} fill="none" stroke="var(--indigo)" strokeWidth="2.5" />
-      {model.calibration_curve.map((p) => (
-        <circle key={p.mean_predicted} cx={x(p.mean_predicted)} cy={y(p.fraction_positive)} r="3" fill="var(--verdigris)" />
+      {model.calibration_curve.map((p, i) => (
+        <circle key={i} cx={x(p.mean_predicted)} cy={y(p.fraction_positive)} r="3" fill="var(--verdigris)" />
       ))}
       <text x={W / 2} y={H - 6} textAnchor="middle" fill="var(--indigo-soft)" style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
         Predicted probability

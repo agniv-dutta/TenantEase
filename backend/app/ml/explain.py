@@ -14,16 +14,9 @@ import shap
 from sqlmodel import Session, select
 
 from app.db import engine
-from app.ml.features import build_current_frame, feature_metadata
+from app.ml.features import build_current_frame, render_feature_sentence
 from app.ml.train import ARTIFACTS
 from app.models import Payment
-
-METHOD_TEMPLATES = {
-    -1.0: "No settled payment yet",
-    0.0: "Last settled payment method was UPI",
-    1.0: "Last settled payment method was cash",
-    2.0: "Last settled payment method was bank transfer",
-}
 
 
 def load_model() -> dict:
@@ -31,29 +24,18 @@ def load_model() -> dict:
     return joblib.load(ARTIFACTS / "model.joblib")
 
 
-def _template_value(feature: str, value: float) -> str:
-    """Human display value for a feature (templates use {value})."""
-    if feature == "last_payment_method":
-        return METHOD_TEMPLATES.get(float(value), str(value))
-    return value
+def render_factor(feature: str, row: object, shap_value: float) -> dict[str, Any]:
+    """Render one factor as a human sentence plus its SHAP direction.
 
-
-def render_factor(feature: str, value: float, direction: str, shap_value: float) -> dict[str, Any]:
-    """Render one factor through its plain-language template."""
-    meta = {m["name"]: m for m in feature_metadata()}
-    entry = meta.get(feature)
-    template = entry["plain_language_template"] if entry else feature
-    display = _template_value(feature, value)
-    try:
-        sentence = template.format(value=display)
-    except (KeyError, ValueError):
-        sentence = f"{feature}: {display}"
+    The row (not just one value) is passed so templates can combine features,
+    for example rent change percent with the months since that change.
+    """
+    direction = "raises" if shap_value > 0 else "lowers"
     return {
         "feature": feature,
-        "template_value": str(display),
-        "direction": "raises" if shap_value > 0 else "lowers",
+        "sentence": render_feature_sentence(feature, row, direction),
+        "direction": direction,
         "contribution": round(float(shap_value), 5),
-        "sentence": sentence,
     }
 
 
@@ -71,12 +53,7 @@ def explain_frame(bundle: dict, frame: pd.DataFrame, top_n: int = 3) -> dict[int
         order = np.argsort(-np.abs(contributions))[:top_n]
         lease_id = int(row["lease_id"])
         out[lease_id] = [
-            render_factor(
-                features[j],
-                float(row[features[j]]),
-                "raises" if contributions[j] > 0 else "lowers",
-                float(contributions[j]),
-            )
+            render_factor(features[j], row, float(contributions[j]))
             for j in order
         ]
     return out

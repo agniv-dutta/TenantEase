@@ -34,6 +34,14 @@ export function useReminders(leaseId?: number) {
   });
 }
 
+export function useMaintenance(leaseId: number | null) {
+  return useQuery({
+    queryKey: ["maintenance", leaseId],
+    queryFn: () => api.maintenance(leaseId as number),
+    enabled: leaseId !== null,
+  });
+}
+
 export function useModelCard() {
   return useQuery({ queryKey: ["model-card"], queryFn: api.modelCard });
 }

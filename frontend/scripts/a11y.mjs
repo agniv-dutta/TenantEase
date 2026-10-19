@@ -9,7 +9,12 @@ const PAGES = ["/", "/outlook", "/outbox", "/model-notes"];
 const browser = await chromium.launch({ channel: "msedge" });
 let failures = 0;
 try {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  // reducedMotion avoids scanning mid-animation opacity dips (which are not the
+  // steady-state colours) and also exercises the reduced-motion reset.
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    reducedMotion: "reduce",
+  });
   const page = await context.newPage();
   for (const path of PAGES) {
     await page.goto(baseUrl + path, { waitUntil: "networkidle" });

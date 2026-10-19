@@ -3,6 +3,7 @@
 import type {
   Guardrail,
   LedgerResponse,
+  MaintenanceRequest,
   ModelCardResponse,
   OutlookResponse,
   PortfolioSummary,
@@ -72,4 +73,11 @@ export const api = {
       body: JSON.stringify({ lease_id: leaseId, language, message }),
     }),
   modelCard: () => request<ModelCardResponse>("/api/model/card"),
+  maintenance: (leaseId?: number) =>
+    request<MaintenanceRequest[]>(`/api/maintenance${leaseId ? `?lease_id=${leaseId}` : ""}`),
+  createMaintenance: (leaseId: number, text: string) =>
+    request<MaintenanceRequest>("/api/maintenance", {
+      method: "POST",
+      body: JSON.stringify({ lease_id: leaseId, text }),
+    }),
 };

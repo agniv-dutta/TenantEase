@@ -27,6 +27,7 @@ export default function OutlookPage() {
     const line = (key: "p10" | "expected" | "p90") =>
       data.points.map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.day).toFixed(1)} ${y(p[key]).toFixed(1)}`).join(" ");
     const band =
+      "M " +
       data.points.map((p) => `${x(p.day).toFixed(1)} ${y(p.p90).toFixed(1)}`).join(" L ") +
       " L " +
       [...data.points].reverse().map((p) => `${x(p.day).toFixed(1)} ${y(p.p10).toFixed(1)}`).join(" L ") +

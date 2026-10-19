@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
+import math
+from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
@@ -10,11 +13,45 @@ from sqlmodel import Session, select
 from app.api.common import payment_cell
 from app.api.reminders import build_plan
 from app.db import get_session
+from app.ml.features import SAFE_FACTOR_SENTENCE
 from app.ml.scoring import current_cycle
 from app.models import Lease, Payment, Property, Reminder, RiskScore, Tenant, Unit
 from app.schemas import Factor, PaymentCell, PlanStep, ReminderOut, TenantDetail
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _fallback_sentence(feature: str) -> str:
+    """Sentence for a stored factor that predates the template renderer."""
+    logger.warning("No stored sentence for feature %r; using the safe default.", feature)
+    return SAFE_FACTOR_SENTENCE
+
+
+def _strength_bucket(scores: list[RiskScore]) -> Callable[[float], str]:
+    """Tertile cut points for |SHAP| across the scored portfolio of one cycle.
+
+    A SHAP value is not a share of the probability, so it never appears as a
+    weight. It only ranks a factor as the main, moderate or minor contributor.
+    """
+    magnitudes = sorted(
+        abs(float(item.get("contribution", 0.0)))
+        for row in scores
+        for item in json.loads(row.top_factors_json or "[]")
+    )
+    if not magnitudes:
+        return lambda _: "minor"
+    lower = magnitudes[max(0, math.ceil(len(magnitudes) / 3) - 1)]
+    upper = magnitudes[max(0, math.ceil(2 * len(magnitudes) / 3) - 1)]
+
+    def bucket(value: float) -> str:
+        if value >= upper:
+            return "main"
+        if value >= lower:
+            return "moderate"
+        return "minor"
+
+    return bucket
 
 
 def _reminder_out(reminder: Reminder) -> ReminderOut:
@@ -51,9 +88,11 @@ def tenant_detail(lease_id: int, session: Session = Depends(get_session)) -> Ten
         select(Payment).where(Payment.lease_id == lease_id).order_by(Payment.cycle_month)
     ).all()
     history: list[PaymentCell] = [payment_cell(p, cycle) for p in payments[:-1]]
-    score = session.exec(
-        select(RiskScore).where(RiskScore.lease_id == lease_id).where(RiskScore.cycle_month == cycle)
-    ).first()
+    portfolio_scores = session.exec(
+        select(RiskScore).where(RiskScore.cycle_month == cycle)
+    ).all()
+    score = next((s for s in portfolio_scores if s.lease_id == lease_id), None)
+    strength_of = _strength_bucket(portfolio_scores)
 
     factors: list[Factor] = []
     risk = None
@@ -62,12 +101,15 @@ def tenant_detail(lease_id: int, session: Session = Depends(get_session)) -> Ten
         risk = score.probability
         tier = score.tier
         for item in json.loads(score.top_factors_json or "[]"):
+            direction = item.get("direction") or (
+                "raises" if float(item.get("contribution", 0.0)) > 0 else "lowers"
+            )
             factors.append(
                 Factor(
                     feature=item["feature"],
-                    template_value=item.get("template_value", ""),
-                    direction=item["direction"],
-                    contribution=item["contribution"],
+                    sentence=item.get("sentence") or _fallback_sentence(item["feature"]),
+                    direction=direction,
+                    strength=strength_of(abs(float(item.get("contribution", 0.0)))),
                 )
             )
 
@@ -103,7 +145,7 @@ def tenant_detail(lease_id: int, session: Session = Depends(get_session)) -> Ten
         history=history,
         probability=risk,
         tier=tier,
-        factors=factors,
+        top_factors=factors,
         plan=plan,
         reminders=[_reminder_out(r) for r in reminders],
         cold_start=cold_start,

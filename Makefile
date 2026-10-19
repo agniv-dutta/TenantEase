@@ -19,6 +19,7 @@ eval:
 	cd $(BACKEND_DIR) && $(PYTHON) -m app.ml.evaluate
 	cd $(BACKEND_DIR) && $(PYTHON) -m app.ml.simulate
 	cd $(BACKEND_DIR) && $(PYTHON) -m app.llm.eval
+	cd $(BACKEND_DIR) && $(PYTHON) -m app.llm.triage_eval
 
 api:
 	cd $(BACKEND_DIR) && $(PYTHON) -m uvicorn app.main:app --reload --port 8000

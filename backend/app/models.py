@@ -92,6 +92,22 @@ class Reminder(SQLModel, table=True):
     metadata_json: str | None = None
 
 
+class MaintenanceRequest(SQLModel, table=True):
+    """A triaged maintenance complaint raised for a lease."""
+
+    __tablename__ = "maintenance_requests"
+    id: int | None = Field(default=None, primary_key=True)
+    lease_id: int = Field(foreign_key="leases.id", index=True)
+    text: str
+    category: str  # plumbing | electrical | appliance | structural | pest | other
+    urgency: str  # emergency | soon | routine
+    suggested_trade: str
+    summary: str
+    method: str  # llm | keyword
+    forced_emergency: bool = False
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
 class RiskScore(SQLModel, table=True):
     """Cached risk probability for a lease in a cycle."""
 

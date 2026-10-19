@@ -55,13 +55,19 @@ def test_ledger_invalid_months(client: TestClient) -> None:
 
 
 def test_tenant_detail_and_404(client: TestClient) -> None:
-    """Tenant detail returns factors/plan; unknown lease is a 404 error body."""
+    """Tenant detail returns top factors and a plan; unknown lease is a 404 error body."""
     lease_id = client.get("/api/ledger").json()["rows"][0]["lease_id"]
     r = client.get(f"/api/tenants/{lease_id}")
     assert r.status_code == 200
     body = r.json()
     assert body["tenant_name"]
-    assert isinstance(body["factors"], list)
+    assert isinstance(body["top_factors"], list)
+    for factor in body["top_factors"]:
+        assert factor["sentence"]
+        assert factor["direction"] in {"raises", "lowers"}
+        assert factor["strength"] in {"main", "moderate", "minor"}
+        assert "contribution" not in factor
+        assert "weight" not in factor
     assert isinstance(body["plan"], list)
     r2 = client.get("/api/tenants/999999")
     assert r2.status_code == 404

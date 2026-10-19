@@ -76,12 +76,16 @@ class LedgerResponse(BaseModel):
 
 
 class Factor(BaseModel):
-    """A single plain-language explanation factor."""
+    """One plain-language explanation factor.
+
+    There is deliberately no weight field: a SHAP value is not a share of the
+    probability, so showing it as a percentage would be misleading.
+    """
 
     feature: str
-    template_value: str
+    sentence: str
     direction: str  # raises | lowers
-    contribution: float
+    strength: str  # main | moderate | minor
 
 
 class PlanStep(BaseModel):
@@ -112,7 +116,7 @@ class TenantDetail(BaseModel):
     history: list[PaymentCell]
     probability: float | None = None
     tier: str | None = None
-    factors: list[Factor]
+    top_factors: list[Factor]
     plan: list[PlanStep]
     reminders: list[ReminderOut]
     cold_start: bool = False
@@ -157,6 +161,28 @@ class GuardrailResult(BaseModel):
     name: str
     passed: bool
     reason: str
+
+
+class MaintenanceCreate(BaseModel):
+    """Request body for triaging a maintenance complaint."""
+
+    lease_id: int
+    text: str
+
+
+class MaintenanceOut(BaseModel):
+    """A triaged maintenance request as returned by the API."""
+
+    id: int
+    lease_id: int
+    text: str
+    category: str
+    urgency: str
+    suggested_trade: str
+    summary: str
+    method: str
+    forced_emergency: bool
+    created_at: datetime
 
 
 class OutlookPoint(BaseModel):
