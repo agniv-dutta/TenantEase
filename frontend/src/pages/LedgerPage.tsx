@@ -36,7 +36,7 @@ export default function LedgerPage() {
     let list = rows;
     if (propertyId !== "all") list = list.filter((r) => String(r.property_id) === propertyId);
     if (needCallOnly) list = list.filter((r) => r.current.tier === "high");
-    if (!riskFirst) {
+    if (!riskFirst && !needCallOnly) {
       list = [...list].sort((a, b) =>
         a.unit_label.localeCompare(b.unit_label, undefined, { numeric: true }),
       );

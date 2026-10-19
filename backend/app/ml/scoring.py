@@ -54,7 +54,14 @@ def score_open_cycle(session: Session, cycle_month: date | None = None) -> int:
     if frame.empty:
         return 0
     raw = bundle["lgbm"].predict_proba(frame[bundle["features"]])[:, 1]
-    calibrated = bundle["isotonic"].predict(raw)
+    iso = bundle["isotonic"].predict(raw)
+    sigmoid = bundle["sigmoid"].predict_proba(raw.reshape(-1, 1))[:, 1]
+    smoothed = 0.5 * (iso + sigmoid)
+    calibrated = {
+        "isotonic": iso,
+        "sigmoid": sigmoid,
+        "smoothed_isotonic_sigmoid": smoothed,
+    }[bundle.get("shipped_calibrator", "isotonic")]
     explained = explain_frame(bundle, frame)
 
     existing = session.exec(
@@ -63,15 +70,17 @@ def score_open_cycle(session: Session, cycle_month: date | None = None) -> int:
     for row in existing:
         session.delete(row)
 
-    for (_, frow), prob in zip(frame.iterrows(), calibrated):
+    for (_, frow), raw_score, prob in zip(frame.iterrows(), raw, calibrated):
         lease_id = int(frow["lease_id"])
         factors = explained.get(lease_id, [])
         session.add(
             RiskScore(
                 lease_id=lease_id,
                 cycle_month=cycle_month,
+                raw_score=float(raw_score),
                 probability=float(prob),
                 tier=tier_for(float(prob)),
+                prev_cycle_outstanding_days=float(frow.get("prev_cycle_outstanding_days", 0.0)),
                 top_factors_json=json.dumps(factors),
             )
         )

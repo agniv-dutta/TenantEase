@@ -22,6 +22,7 @@ import pandas as pd
 from lightgbm import LGBMClassifier, early_stopping
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import average_precision_score, brier_score_loss
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlmodel import Session
@@ -35,6 +36,41 @@ SEED = 42
 N_TRAIN_CYCLES = 16
 N_VAL_CYCLES = 4
 N_TEST_CYCLES = 4
+
+
+def _expected_calibration_error(y: np.ndarray, p: np.ndarray, bins: int = 10) -> float:
+    """Equal-count-bin expected calibration error."""
+    order = np.argsort(p)
+    chunks = np.array_split(order, bins)
+    ece = 0.0
+    for chunk in chunks:
+        if len(chunk) == 0:
+            continue
+        ece += len(chunk) / len(y) * abs(float(p[chunk].mean()) - float(y[chunk].mean()))
+    return float(ece)
+
+
+def _select_calibration(y_val: pd.Series, val_scores: dict[str, np.ndarray]) -> tuple[str, dict[str, dict[str, float]]]:
+    """Pick the shipped calibration using validation Brier then ECE."""
+    y = y_val.to_numpy().astype(int)
+    summary = {
+        name: {
+            "pr_auc": round(float(average_precision_score(y, p)), 4),
+            "brier": round(float(brier_score_loss(y, p)), 4),
+            "ece": round(float(_expected_calibration_error(y, p)), 4),
+        }
+        for name, p in val_scores.items()
+    }
+    shipped = min(
+        summary,
+        key=lambda name: (
+            summary[name]["brier"],
+            summary[name]["ece"],
+            -summary[name]["pr_auc"],
+            name,
+        ),
+    )
+    return shipped, summary
 
 
 def load_training_dataframe() -> pd.DataFrame:
@@ -103,15 +139,32 @@ def train_main_model(df: pd.DataFrame, features: list[str]) -> dict:
         callbacks=[early_stopping(50, verbose=False)],
     )
 
-    # Isotonic calibration fitted on the validation set.
+    # Calibrators fitted on validation-set raw scores.
     val_proba = lgbm.predict_proba(x_val)[:, 1]
     iso = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
     iso.fit(val_proba, y_val.to_numpy())
+    sigmoid = LogisticRegression(max_iter=2000, random_state=SEED)
+    sigmoid.fit(val_proba.reshape(-1, 1), y_val.to_numpy())
+    val_iso = iso.predict(val_proba)
+    val_sigmoid = sigmoid.predict_proba(val_proba.reshape(-1, 1))[:, 1]
+    val_smoothed = 0.5 * (val_iso + val_sigmoid)
+    shipped_calibrator, calibration_validation = _select_calibration(
+        y_val,
+        {
+            "isotonic": val_iso,
+            "sigmoid": val_sigmoid,
+            "smoothed_isotonic_sigmoid": val_smoothed,
+        },
+    )
 
-    # Operating threshold: maximize Youden's J on calibrated validation scores.
+    # Operating threshold: maximize Youden's J on shipped calibrated scores.
     from sklearn.metrics import roc_curve
 
-    val_cal = iso.predict(val_proba)
+    val_cal = {
+        "isotonic": val_iso,
+        "sigmoid": val_sigmoid,
+        "smoothed_isotonic_sigmoid": val_smoothed,
+    }[shipped_calibrator]
     if len(np.unique(y_val)) < 2:
         threshold = 0.5
     else:
@@ -122,6 +175,9 @@ def train_main_model(df: pd.DataFrame, features: list[str]) -> dict:
         "logistic": lr,
         "lgbm": lgbm,
         "isotonic": iso,
+        "sigmoid": sigmoid,
+        "shipped_calibrator": shipped_calibrator,
+        "calibration_validation": calibration_validation,
         "features": features,
         "threshold": threshold,
         "best_iteration": int(getattr(lgbm, "best_iteration_", 0) or 0),
@@ -143,8 +199,32 @@ def predict_test(model_bundle: dict, df: pd.DataFrame) -> pd.DataFrame:
     test["b1"] = model_bundle["logistic"].predict_proba(x_test)[:, 1]
     raw = model_bundle["lgbm"].predict_proba(x_test)[:, 1]
     test["m_raw"] = raw
-    test["m"] = model_bundle["isotonic"].predict(raw)
-    return test[["lease_id", "cycle_month", "split", "is_late", "b0", "b1", "m_raw", "m"]]
+    test["m_isotonic"] = model_bundle["isotonic"].predict(raw)
+    test["m_sigmoid"] = model_bundle["sigmoid"].predict_proba(raw.reshape(-1, 1))[:, 1]
+    test["m_smoothed"] = 0.5 * (test["m_isotonic"] + test["m_sigmoid"])
+    test["m"] = test[
+        {
+            "isotonic": "m_isotonic",
+            "sigmoid": "m_sigmoid",
+            "smoothed_isotonic_sigmoid": "m_smoothed",
+        }[model_bundle["shipped_calibrator"]]
+    ]
+    return test[
+        [
+            "lease_id",
+            "cycle_month",
+            "split",
+            "is_late",
+            "b0",
+            "b1",
+            "m_raw",
+            "m_isotonic",
+            "m_sigmoid",
+            "m_smoothed",
+            "m",
+            "prev_cycle_outstanding_days",
+        ]
+    ]
 
 
 def main() -> None:
@@ -156,15 +236,16 @@ def main() -> None:
     test_preds = predict_test(bundle, df)
 
     # Sanity: model should beat the rule baseline on test PR-AUC.
-    from sklearn.metrics import average_precision_score
-
     pr_m = average_precision_score(test_preds["is_late"], test_preds["m"])
     pr_b0 = average_precision_score(test_preds["is_late"], test_preds["b0"])
     joblib.dump(
         {
             "lgbm": bundle["lgbm"],
             "isotonic": bundle["isotonic"],
+            "sigmoid": bundle["sigmoid"],
             "logistic": bundle["logistic"],
+            "shipped_calibrator": bundle["shipped_calibrator"],
+            "calibration_validation": bundle["calibration_validation"],
             "features": features,
             "threshold": bundle["threshold"],
             "best_iteration": bundle["best_iteration"],
@@ -181,6 +262,7 @@ def main() -> None:
         "pr_auc_b0": float(pr_b0),
         "threshold": bundle["threshold"],
         "best_iteration": bundle["best_iteration"],
+        "shipped_calibrator": bundle["shipped_calibrator"],
         "beats_baseline": bool(pr_m > pr_b0),
     }
     (ARTIFACTS / "train_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")

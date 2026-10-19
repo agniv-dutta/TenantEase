@@ -23,6 +23,8 @@ interface Metrics {
   test_base_rate: number;
   operating_threshold: number;
   models: Record<string, ModelMetrics>;
+  shipped_model_key?: string;
+  calibration_choice?: { name: string; reason: string };
   calibration_note: string;
   ablation_no_occupation: { pr_auc: number; roc_auc: number };
   paired_comparisons: Record<string, Record<string, { estimate: number; ci95: [number, number] }>>;
@@ -59,6 +61,9 @@ const MODEL_LABELS: Record<string, string> = {
   B1_logistic: "B1 · logistic",
   M_lgbm_raw: "M · LightGBM (raw)",
   M_lgbm_isotonic: "M · LightGBM (isotonic)",
+  M_lgbm_sigmoid: "M · LightGBM (sigmoid/Platt)",
+  M_lgbm_smoothed: "M · LightGBM (smoothed isotonic)",
+  M_lgbm_shipped: "M · shipped calibration",
 };
 
 const GROUP_LABELS: Record<string, string> = {
@@ -103,7 +108,8 @@ export default function ModelNotesPage() {
   const metrics = data?.metrics as unknown as Metrics | undefined;
   const slices = data?.slices as unknown as Slices | undefined;
 
-  const calibrationModel = useMemo(() => metrics?.models?.M_lgbm_isotonic, [metrics]);
+  const shippedKey = metrics?.shipped_model_key ?? "M_lgbm_isotonic";
+  const shippedModel = useMemo(() => (metrics ? metrics.models[shippedKey] : undefined), [metrics, shippedKey]);
 
   return (
     <>
@@ -157,7 +163,10 @@ export default function ModelNotesPage() {
           </table>
           <p className="small soft">
             Ablation without occupation: PR-AUC {metrics.ablation_no_occupation.pr_auc.toFixed(3)}, ROC-AUC{" "}
-            {metrics.ablation_no_occupation.roc_auc.toFixed(3)}. {metrics.calibration_note}
+            {metrics.ablation_no_occupation.roc_auc.toFixed(3)}. {metrics.calibration_note}{" "}
+            {metrics.calibration_choice
+              ? `Shipped calibration: ${metrics.calibration_choice.name}. ${metrics.calibration_choice.reason}`
+              : ""}
           </p>
 
           <h2 className="section-title">Capacity: top share of leases per cycle</h2>
@@ -165,7 +174,7 @@ export default function ModelNotesPage() {
             <thead>
               <tr>
                 <th scope="col">Follow-up</th>
-                {Object.keys(metrics.models.M_lgbm_isotonic.top_k).map((k) => (
+                {shippedModel && Object.keys(shippedModel.top_k).map((k) => (
                   <th key={k} scope="col" className="num">
                     {k}%
                   </th>
@@ -175,13 +184,13 @@ export default function ModelNotesPage() {
             <tbody>
               <tr>
                 <td>Precision</td>
-                {Object.values(metrics.models.M_lgbm_isotonic.top_k).map((v, i) => (
+                {shippedModel && Object.values(shippedModel.top_k).map((v, i) => (
                   <td key={i} className="num">{v.precision.toFixed(3)}</td>
                 ))}
               </tr>
               <tr>
                 <td>Recall</td>
-                {Object.values(metrics.models.M_lgbm_isotonic.top_k).map((v, i) => (
+                {shippedModel && Object.values(shippedModel.top_k).map((v, i) => (
                   <td key={i} className="num">{v.recall.toFixed(3)}</td>
                 ))}
               </tr>
@@ -189,7 +198,7 @@ export default function ModelNotesPage() {
           </table>
 
           <h2 className="section-title">Calibration</h2>
-          {calibrationModel && <CalibrationPlot model={calibrationModel} />}
+          {shippedModel && <CalibrationPlot model={shippedModel} />}
 
           {slices && (
             <>

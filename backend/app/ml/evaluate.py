@@ -225,6 +225,12 @@ def main() -> None:
     DOCS.mkdir(parents=True, exist_ok=True)
     bundle = joblib.load(ARTIFACTS / "model.joblib")
     preds: pd.DataFrame = joblib.load(ARTIFACTS / "test_predictions.joblib")
+    shipped_calibrator = bundle.get("shipped_calibrator", "isotonic")
+    shipped_key = {
+        "isotonic": "M_lgbm_isotonic",
+        "sigmoid": "M_lgbm_sigmoid",
+        "smoothed_isotonic_sigmoid": "M_lgbm_smoothed",
+    }[shipped_calibrator]
     threshold = float(bundle["threshold"])
 
     y = preds["is_late"].to_numpy().astype(int)
@@ -239,7 +245,10 @@ def main() -> None:
             "B0_rule_baseline": model_metrics(y, preds["b0"].to_numpy(), lease_ids, preds["cycle_month"]),
             "B1_logistic": model_metrics(y, preds["b1"].to_numpy(), lease_ids, preds["cycle_month"]),
             "M_lgbm_raw": model_metrics(y, preds["m_raw"].to_numpy(), lease_ids, preds["cycle_month"]),
-            "M_lgbm_isotonic": model_metrics(y, preds["m"].to_numpy(), lease_ids, preds["cycle_month"]),
+            "M_lgbm_isotonic": model_metrics(y, preds["m_isotonic"].to_numpy(), lease_ids, preds["cycle_month"]),
+            "M_lgbm_sigmoid": model_metrics(y, preds["m_sigmoid"].to_numpy(), lease_ids, preds["cycle_month"]),
+            "M_lgbm_smoothed": model_metrics(y, preds["m_smoothed"].to_numpy(), lease_ids, preds["cycle_month"]),
+            "M_lgbm_shipped": model_metrics(y, preds["m"].to_numpy(), lease_ids, preds["cycle_month"]),
         },
         "paired_comparisons": {
             "M_lgbm_raw_minus_B1_logistic": paired_bootstrap_comparison(
@@ -249,12 +258,16 @@ def main() -> None:
                 y, preds["m_raw"].to_numpy(), preds["b0"].to_numpy(), lease_ids
             ),
         },
-        "calibration_note": (
-            "Isotonic calibration maps many distinct raw scores onto a few "
-            "probability levels. That improves probability quality (Brier, ECE) "
-            "but creates ties that reduce ranking metrics such as PR-AUC. The "
-            "uncalibrated M is reported alongside the calibrated M for honesty."
-        ),
+        "shipped_model_key": shipped_key,
+        "calibration_validation": bundle.get("calibration_validation", {}),
+        "calibration_choice": {
+            "name": shipped_calibrator,
+            "reason": (
+                "Selected on validation set by lowest Brier score, with ECE as "
+                "tie-breaker; PR-AUC is reported for ranking transparency."
+            ),
+        },
+        "calibration_note": "Ranking in product uses raw model scores; displayed probabilities are calibrated.",
     }
 
     full = load_training_dataframe()
@@ -276,16 +289,21 @@ def main() -> None:
     card = render_model_card(metrics, slices)
     (DOCS / "model_card.md").write_text(card, encoding="utf-8")
     (ARTIFACTS / "model_card.md").write_text(card, encoding="utf-8")
-    print(f"Wrote metrics, slices, shap, simulation and model card. Test PR-AUC M={metrics['models']['M_lgbm_isotonic']['pr_auc']}")
+    print(f"Wrote metrics, slices, shap, simulation and model card. Test PR-AUC M={metrics['models']['M_lgbm_shipped']['pr_auc']}")
 
 
 def render_model_card(metrics: dict, slices: dict) -> str:
     """Render the model card markdown from computed artifacts."""
-    m = metrics["models"]["M_lgbm_isotonic"]
+    shipped = metrics["models"]["M_lgbm_shipped"]
+    shipped_key = metrics["shipped_model_key"]
     m_raw = metrics["models"]["M_lgbm_raw"]
+    m_iso = metrics["models"]["M_lgbm_isotonic"]
+    m_sigmoid = metrics["models"]["M_lgbm_sigmoid"]
+    m_smoothed = metrics["models"]["M_lgbm_smoothed"]
     b0 = metrics["models"]["B0_rule_baseline"]
     b1 = metrics["models"]["B1_logistic"]
     abl = metrics["ablation_no_occupation"]
+    choice = metrics["calibration_choice"]
     lines = [
         "# Model card: TenantEase Khata late-payment risk model",
         "",
@@ -324,9 +342,13 @@ def render_model_card(metrics: dict, slices: dict) -> str:
         f"| B0 rule baseline | {b0['pr_auc']:.3f} {fmt_ci(b0['pr_auc_ci'])} | {b0['roc_auc']:.3f} | {b0['brier']:.3f} | {b0['ece']:.3f} |",
         f"| B1 logistic | {b1['pr_auc']:.3f} {fmt_ci(b1['pr_auc_ci'])} | {b1['roc_auc']:.3f} | {b1['brier']:.3f} | {b1['ece']:.3f} |",
         f"| M LightGBM (raw) | {m_raw['pr_auc']:.3f} {fmt_ci(m_raw['pr_auc_ci'])} | {m_raw['roc_auc']:.3f} | {m_raw['brier']:.3f} | {m_raw['ece']:.3f} |",
-        f"| M LightGBM + isotonic | {m['pr_auc']:.3f} {fmt_ci(m['pr_auc_ci'])} | {m['roc_auc']:.3f} | {m['brier']:.3f} | {m['ece']:.3f} |",
+        f"| M LightGBM + isotonic | {m_iso['pr_auc']:.3f} {fmt_ci(m_iso['pr_auc_ci'])} | {m_iso['roc_auc']:.3f} | {m_iso['brier']:.3f} | {m_iso['ece']:.3f} |",
+        f"| M LightGBM + sigmoid (Platt) | {m_sigmoid['pr_auc']:.3f} {fmt_ci(m_sigmoid['pr_auc_ci'])} | {m_sigmoid['roc_auc']:.3f} | {m_sigmoid['brier']:.3f} | {m_sigmoid['ece']:.3f} |",
+        f"| M LightGBM + smoothed isotonic | {m_smoothed['pr_auc']:.3f} {fmt_ci(m_smoothed['pr_auc_ci'])} | {m_smoothed['roc_auc']:.3f} | {m_smoothed['brier']:.3f} | {m_smoothed['ece']:.3f} |",
+        f"| M shipped calibrator ({choice['name']}) | {shipped['pr_auc']:.3f} {fmt_ci(shipped['pr_auc_ci'])} | {shipped['roc_auc']:.3f} | {shipped['brier']:.3f} | {shipped['ece']:.3f} |",
         "",
-        metrics["calibration_note"],
+        f"Shipped calibration: {choice['name']} ({shipped_key}). {choice['reason']}",
+        "Ranking in product uses `raw_score`; calibrated probabilities are used for display, tiers and outlook simulation.",
         "",
         "Operating threshold (Youden's J on validation): "
         f"{metrics['operating_threshold']:.3f}.",
@@ -336,14 +358,14 @@ def render_model_card(metrics: dict, slices: dict) -> str:
         "| K | Precision | Recall |",
         "|---|---|---|",
     ]
-    for k, v in m["top_k"].items():
+    for k, v in shipped["top_k"].items():
         lines.append(f"| top {k}% | {v['precision']:.1%} | {v['recall']:.1%} |")
     lines += [
         "",
         "## Slices and fairness audit",
         "",
         f"Ablation without occupation type: PR-AUC {abl['pr_auc']:.3f} "
-        f"(with occupation {m['pr_auc']:.3f}).",
+        f"(with occupation {shipped['pr_auc']:.3f}).",
         "",
         "Gap flags (any pairwise gap above 10 percentage points at the operating threshold):",
     ]
