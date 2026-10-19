@@ -9,7 +9,7 @@ import { useOutlook } from "../lib/queries";
 
 const W = 760;
 const H = 320;
-const M = { top: 24, right: 24, bottom: 40, left: 76 };
+const M = { top: 24, right: 24, bottom: 52, left: 76 };
 
 export default function OutlookPage() {
   const { data, isLoading, error } = useOutlook();
@@ -76,20 +76,47 @@ export default function OutlookPage() {
             <path d={chart.band} fill="url(#band-hatch)" stroke="none" />
             <path d={chart.line("expected")} fill="none" stroke="var(--indigo)" strokeWidth="2.5" />
 
-            {[1, 5, 10].map((d) =>
+            {[1, 5, 10, 15, 20, 25, 30].map((d) =>
               d >= chart.xMin && d <= chart.xMax ? (
                 <g key={d}>
-                  <line x1={chart.x(d)} y1={M.top} x2={chart.x(d)} y2={H - M.bottom} stroke="var(--rule)" strokeDasharray="3 3" />
+                  {[1, 5, 10].includes(d) && (
+                    <line x1={chart.x(d)} y1={M.top} x2={chart.x(d)} y2={H - M.bottom} stroke="var(--rule)" strokeDasharray="3 3" />
+                  )}
                   <text x={chart.x(d)} y={H - M.bottom + 18} textAnchor="middle" fill="var(--indigo-soft)" style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
                     {d}
                   </text>
                 </g>
               ) : null,
             )}
-            <text x={W / 2} y={H - 6} textAnchor="middle" fill="var(--indigo-soft)" style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
+            <text x={W / 2} y={H - 8} textAnchor="middle" fill="var(--indigo-soft)" style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
               Day of the month
             </text>
           </svg>
+
+          <p className="small soft">
+            Expected collections rise through the cycle. The shaded area shows the low to high range, and dashed guides mark due days 1, 5 and 10.
+          </p>
+          <table className="data">
+            <caption className="small soft">Daily collection ranges, the text alternative to the chart.</caption>
+            <thead>
+              <tr>
+                <th scope="col">Day</th>
+                <th scope="col">Low</th>
+                <th scope="col">Expected</th>
+                <th scope="col">High</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.points.map((p) => (
+                <tr key={p.day}>
+                  <td className="num">{p.day}</td>
+                  <td className="num">{formatINR(Math.round(p.p10))}</td>
+                  <td className="num">{formatINR(Math.round(p.expected))}</td>
+                  <td className="num">{formatINR(Math.round(p.p90))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
           <hr className="rule" />
           <h2 className="subhead">What if reminders shift payment earlier</h2>
@@ -117,27 +144,6 @@ export default function OutlookPage() {
             forward into the first ten days. Treat it as a sketch of scale, not a forecast.
           </p>
 
-          <table className="data">
-            <caption className="small soft">Collections by day, for screen readers and copy-paste.</caption>
-            <thead>
-              <tr>
-                <th scope="col">Day</th>
-                <th scope="col">Low</th>
-                <th scope="col">Expected</th>
-                <th scope="col">High</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.points.filter((p) => p.day % 5 === 0 || p.day === 1).map((p) => (
-                <tr key={p.day}>
-                  <td className="num">{p.day}</td>
-                  <td className="num">{formatINR(Math.round(p.p10))}</td>
-                  <td className="num">{formatINR(Math.round(p.expected))}</td>
-                  <td className="num">{formatINR(Math.round(p.p90))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </>
       )}
     </>

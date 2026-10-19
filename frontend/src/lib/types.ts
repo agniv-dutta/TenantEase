@@ -51,6 +51,7 @@ export interface PortfolioSummary {
   total_rent_due_inr: number;
   tiers: TierCounts;
   cycle_month: string;
+  as_of_date: string;
 }
 
 export type FactorStrength = "main" | "moderate" | "minor";
@@ -79,6 +80,8 @@ export interface Guardrail {
 export interface Reminder {
   id: number;
   lease_id: number;
+  tenant_name: string;
+  unit_label: string;
   cycle_month: string;
   channel: string;
   tone: string;

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:stamps": "node scripts/stamp-test.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "screenshots": "node scripts/screenshots.mjs http://localhost:5173 ../docs/screenshots",

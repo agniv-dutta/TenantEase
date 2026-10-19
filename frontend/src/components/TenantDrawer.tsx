@@ -42,6 +42,7 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
   const [requestText, setRequestText] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [showFullHistory, setShowFullHistory] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -57,6 +58,7 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
       setMessage("");
       setGuardrails([]);
       setEdited(false);
+      setShowFullHistory(false);
     }
   }, [data]);
 
@@ -79,6 +81,7 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
 
   const allPassed = guardrails.length > 0 && guardrails.every((g) => g.passed);
   const approved = reminder?.status === "approved";
+  const history = showFullHistory ? data.history : data.history.slice(-12);
 
   async function handleDraft() {
     setBusy(true);
@@ -162,11 +165,11 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
       <h3 className="subhead">Payment history</h3>
       <div className="history-strip">
         {data.history.length === 0 && <span className="small soft">No prior cycles.</span>}
-        {data.history.map((cell) => (
+        {history.map((cell) => (
           <div key={cell.cycle_month} className="history-cell">
             <span className="num small soft">{formatDate(cell.cycle_month)}</span>
             {cell.status === "paid_late" ? (
-              <Stamp kind="late" detail={cell.days_late ? `+${cell.days_late}` : undefined} seed={`h-${leaseId}-${cell.cycle_month}`} />
+              <Stamp kind="late" detail={cell.days_late ? `+${cell.days_late} days` : undefined} seed={`h-${leaseId}-${cell.cycle_month}`} />
             ) : cell.status === "unpaid_overdue" ? (
               <Stamp kind="overdue" seed={`h-${leaseId}-${cell.cycle_month}`} />
             ) : (
@@ -175,6 +178,11 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
           </div>
         ))}
       </div>
+      {data.history.length > 12 && (
+        <button className="text-button small" onClick={() => setShowFullHistory((expanded) => !expanded)}>
+          {showFullHistory ? "Show recent history" : "Show full history"}
+        </button>
+      )}
 
       {!data.cold_start && data.probability != null && data.tier && (
         <>

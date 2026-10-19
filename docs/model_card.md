@@ -16,6 +16,10 @@ Never use this score for eviction, rent pricing, tenant screening, or any
 decision about a person. It only decides who gets an earlier or more
 personal nudge.
 
+## Why this model
+
+On the synthetic data, the paired lease bootstrap PR-AUC difference for raw LightGBM minus logistic regression is 0.010 (95% interval -0.042 to 0.058), so the models cannot be distinguished here. The synthetic process was built with logistic effects, so near parity is expected. Logistic coefficients are directly readable; SHAP explanations for LightGBM are an approximation. Boosting was kept because it handles missing values and interactions without manual feature engineering, and the pipeline is the thing being demonstrated. Against B0, the raw LightGBM minus rule baseline PR-AUC difference is 0.209 (95% interval 0.144 to 0.274); paired differences for ROC-AUC and Brier are available in metrics.json.
+
 ## Data
 
 Synthetic: 6 properties, ~140 units, 24 closed cycles, 540 test rows.

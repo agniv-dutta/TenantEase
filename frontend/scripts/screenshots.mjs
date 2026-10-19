@@ -3,7 +3,7 @@
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 
-const baseUrl = process.argv[2] ?? "http://localhost:5173";
+const baseUrl = process.argv[2] ?? "http://127.0.0.1:5173";
 const outDir = process.argv[3] ?? "../docs/screenshots";
 
 const PAGES = [
@@ -27,7 +27,8 @@ try {
     const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
     const page = await context.newPage();
     for (const [name, path] of PAGES) {
-      await page.goto(baseUrl + path, { waitUntil: "networkidle" });
+      await page.goto(baseUrl + path, { waitUntil: "domcontentloaded" });
+      await page.locator(".page-title").first().waitFor();
       await page.waitForTimeout(1200); // let the stamps settle
       const full = name !== "ledger";
       await page.screenshot({ path: `${outDir}/${name}-${width}.png`, fullPage: full });
@@ -35,7 +36,8 @@ try {
     }
 
     // Tenant drawer, from the first ledger row
-    await page.goto(baseUrl + "/", { waitUntil: "networkidle" });
+    await page.goto(baseUrl + "/", { waitUntil: "domcontentloaded" });
+    await page.locator(".page-title").first().waitFor();
     const row = page.locator(".ledger tbody tr").first();
     if (await row.count()) {
       await row.click();

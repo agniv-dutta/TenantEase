@@ -35,7 +35,7 @@ def current_cycle(session: Session) -> date:
     )
     missing = [cycle for cycle in required if cycle not in present]
     if missing:
-        months = ", ".join(c.month_name() + " " + str(c.year) for c in reversed(missing))
+        months = ", ".join(c.strftime("%B %Y") for c in reversed(missing))
         raise FileNotFoundError(
             f"The data has no payments for {months}; it does not cover the open "
             f"cycle {required[0].isoformat()}. Reseed the database with `make seed`."

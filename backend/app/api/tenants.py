@@ -54,12 +54,14 @@ def _strength_bucket(scores: list[RiskScore]) -> Callable[[float], str]:
     return bucket
 
 
-def _reminder_out(reminder: Reminder) -> ReminderOut:
-    """Convert a reminder row to the API schema."""
+def _reminder_out(reminder: Reminder, tenant_name: str, unit_label: str) -> ReminderOut:
+    """Convert a reminder row and its tenant/unit labels to the API schema."""
     meta = json.loads(reminder.metadata_json) if reminder.metadata_json else {}
     return ReminderOut(
         id=reminder.id,  # type: ignore[arg-type]
         lease_id=reminder.lease_id,
+        tenant_name=tenant_name,
+        unit_label=unit_label,
         cycle_month=reminder.cycle_month,
         channel=reminder.channel,
         tone=reminder.tone,
@@ -147,7 +149,7 @@ def tenant_detail(lease_id: int, session: Session = Depends(get_session)) -> Ten
         tier=tier,
         top_factors=factors,
         plan=plan,
-        reminders=[_reminder_out(r) for r in reminders],
+        reminders=[_reminder_out(r, tenant.name, unit.label) for r in reminders],  # type: ignore[union-attr]
         cold_start=cold_start,
     )
 

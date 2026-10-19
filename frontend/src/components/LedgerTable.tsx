@@ -12,15 +12,15 @@ interface LedgerTableProps {
   shouldAnimate: (leaseId: number) => boolean;
 }
 
-function Cell({ cell, seed, animate }: { cell: PaymentCell; seed: string; animate: boolean }) {
+function Cell({ cell, seed, animate, delayMs = 0 }: { cell: PaymentCell; seed: string; animate: boolean; delayMs?: number }) {
   const detail = cell.days_late ? `+${cell.days_late} days` : undefined;
   switch (cell.status) {
     case "paid_late":
-      return <Stamp kind="late" detail={detail} seed={seed} animateIn={animate} />;
+      return <Stamp kind="late" detail={detail} seed={seed} />;
     case "unpaid_overdue":
-      return <Stamp kind="overdue" seed={seed} animateIn={animate} />;
+      return <Stamp kind="overdue" seed={seed} animateIn={animate} delayMs={delayMs} />;
     case "open":
-      return <Stamp kind="due" seed={seed} animateIn={animate} />;
+      return <Stamp kind="due" seed={seed} animateIn={animate} delayMs={delayMs} />;
     case "paid_on_time":
       return <span className="num cell-paid">{cell.paid_date ? formatDate(cell.paid_date) : "—"}</span>;
     default:
@@ -75,13 +75,11 @@ export default function LedgerTable({ rows, onOpen, shouldAnimate }: LedgerTable
               </td>
               {row.cycles.map((cell, i) => (
                 <td key={cell.cycle_month} className={`cycle-cell${i < months.length - 2 ? " hide-narrow" : ""}`}>
-                  <span style={animate ? { animation: `stamp-in 160ms ease-out ${delay}ms both` } : undefined}>
-                    <Cell cell={cell} seed={`${row.lease_id}-${cell.cycle_month}`} animate={false} />
-                  </span>
+                  <Cell cell={cell} seed={`${row.lease_id}-${cell.cycle_month}`} animate={animate} delayMs={delay} />
                 </td>
               ))}
               <td className="cycle-cell">
-                <Cell cell={row.current} seed={`${row.lease_id}-open`} animate={animate} />
+                <Cell cell={row.current} seed={`${row.lease_id}-open`} animate={animate} delayMs={delay} />
               </td>
               <td className="cell-risk cycle-cell">
                 {row.current.probability != null && tier ? (

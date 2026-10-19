@@ -84,15 +84,17 @@ function CalibrationPlot({ model }: { model: ModelMetrics }) {
     .join(" ");
 
   return (
-    <svg className="chart-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Calibration curve">
-      <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} stroke="var(--rule)" strokeDasharray="4 4" />
+    <svg className="chart-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-labelledby="calibration-title" aria-describedby="calibration-description">
+      <title id="calibration-title">Calibration curve</title>
+      <desc id="calibration-description">The dashed diagonal marks perfect calibration. The plotted points compare predicted probability with the share of leases that were actually late.</desc>
+      <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} stroke="var(--indigo-soft)" strokeDasharray="4 4" />
       <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="var(--indigo)" />
       <line x1={pad} y1={pad} x2={pad} y2={H - pad} stroke="var(--indigo)" />
       <path d={line} fill="none" stroke="var(--indigo)" strokeWidth="2.5" />
       {model.calibration_curve.map((p, i) => (
         <circle key={i} cx={x(p.mean_predicted)} cy={y(p.fraction_positive)} r="3" fill="var(--verdigris)" />
       ))}
-      <text x={W / 2} y={H - 6} textAnchor="middle" fill="var(--indigo-soft)" style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
+      <text x={W / 2} y={H - 12} textAnchor="middle" fill="var(--indigo-soft)" style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
         Predicted probability
       </text>
       <text x={12} y={H / 2} textAnchor="middle" transform={`rotate(-90 12 ${H / 2})`} fill="var(--indigo-soft)" style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
@@ -198,7 +200,33 @@ export default function ModelNotesPage() {
           </table>
 
           <h2 className="section-title">Calibration</h2>
-          {shippedModel && <CalibrationPlot model={shippedModel} />}
+          {shippedModel && (
+            <>
+              <CalibrationPlot model={shippedModel} />
+              <p className="small soft">
+                The dashed diagonal shows perfect calibration. Points show the observed late share for each predicted probability bin; the table gives the values behind the chart.
+              </p>
+              <table className="data">
+                <caption className="small soft">Calibration curve values</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Predicted probability</th>
+                    <th scope="col">Actually late</th>
+                    <th scope="col">Leases</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shippedModel.calibration_curve.map((point, index) => (
+                    <tr key={index}>
+                      <td className="num">{point.mean_predicted.toFixed(3)}</td>
+                      <td className="num">{point.fraction_positive.toFixed(3)}</td>
+                      <td className="num">{point.n}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
 
           {slices && (
             <>

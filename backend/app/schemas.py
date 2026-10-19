@@ -128,6 +128,8 @@ class ReminderOut(BaseModel):
 
     id: int
     lease_id: int
+    tenant_name: str
+    unit_label: str
     cycle_month: date
     channel: str
     tone: str

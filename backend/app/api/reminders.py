@@ -81,12 +81,17 @@ def _has_overdue(session: Session, lease_id: int, before: date) -> bool:
     return False
 
 
-def _to_out(reminder: Reminder) -> ReminderOut:
-    """Convert a Reminder row to the API schema."""
+def _to_out(reminder: Reminder, session: Session) -> ReminderOut:
+    """Convert a reminder row and its tenant/unit labels to the API schema."""
     meta = json.loads(reminder.metadata_json) if reminder.metadata_json else {}
+    lease = session.get(Lease, reminder.lease_id)
+    tenant = session.get(Tenant, lease.tenant_id) if lease else None
+    unit = session.get(Unit, lease.unit_id) if lease else None
     return ReminderOut(
         id=reminder.id,  # type: ignore[arg-type]
         lease_id=reminder.lease_id,
+        tenant_name=tenant.name if tenant else "Unknown tenant",
+        unit_label=unit.label if unit else "Unknown unit",
         cycle_month=reminder.cycle_month,
         channel=reminder.channel,
         tone=reminder.tone,
@@ -106,7 +111,7 @@ def list_reminders(lease_id: int | None = None, session: Session = Depends(get_s
     stmt = select(Reminder).order_by(Reminder.created_at.desc())  # type: ignore[attr-defined]
     if lease_id is not None:
         stmt = stmt.where(Reminder.lease_id == lease_id)
-    return [_to_out(r) for r in session.exec(stmt).all()]
+    return [_to_out(r, session) for r in session.exec(stmt).all()]
 
 
 @router.post("/draft", response_model=ReminderOut)
@@ -164,7 +169,7 @@ def draft_reminder(body: DraftRequest, session: Session = Depends(get_session)) 
     session.add(reminder)
     session.commit()
     session.refresh(reminder)
-    out = _to_out(reminder)
+    out = _to_out(reminder, session)
     if notes:
         out.guardrails = out.guardrails + [{"name": "tone_adjusted", "passed": True, "reason": notes[0]}]
     return out
@@ -200,4 +205,4 @@ def approve_reminder(reminder_id: int, session: Session = Depends(get_session)) 
     session.add(reminder)
     session.commit()
     session.refresh(reminder)
-    return _to_out(reminder)
+    return _to_out(reminder, session)

@@ -3,7 +3,7 @@
  *  always lands at the same angle. */
 
 const LABELS = {
-  late: { en: "LATE", hi: "देरी", ink: "var(--stamp-red)", text: "var(--stamp-red)" },
+  late: { en: "LATE", hi: "", ink: "var(--stamp-red)", text: "var(--stamp-red)" },
   overdue: { en: "OVERDUE", hi: "बाकी", ink: "var(--stamp-red)", text: "var(--stamp-red)" },
   due: { en: "DUE", hi: "देय", ink: "var(--haldi)", text: "var(--indigo)" },
   approved: { en: "APPROVED", hi: "मंज़ूर", ink: "var(--verdigris)", text: "var(--verdigris)" },
@@ -99,9 +99,11 @@ export default function Stamp({ kind, detail, seed, animateIn = false, delayMs =
               {detail}
             </text>
           )}
-          <text x="93" y="17" textAnchor="middle" fill={text} style={{ fontFamily: "var(--font-display)", fontSize: 9, opacity: 0.85 }}>
-            {hi}
-          </text>
+          {hi && (
+            <text x="93" y="17" textAnchor="middle" fill={text} style={{ fontFamily: "var(--font-display)", fontSize: 9, opacity: 0.85 }}>
+              {hi}
+            </text>
+          )}
         </g>
       </svg>
     </span>

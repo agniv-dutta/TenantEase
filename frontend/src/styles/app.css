@@ -238,9 +238,9 @@
 }
 
 .history-strip {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--s-2);
-  flex-wrap: wrap;
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
   padding: var(--s-3) 0;
@@ -248,10 +248,36 @@
 
 .history-cell {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: var(--s-1);
-  min-width: 52px;
   font-size: var(--fs-small);
+}
+
+.history-cell .stamp-cell,
+.history-cell .stamp-cell svg {
+  width: 100%;
+  height: auto;
+}
+
+.text-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--indigo);
+  text-decoration: underline;
+  text-underline-offset: var(--s-1);
+}
+
+.text-filter[aria-pressed="true"] {
+  text-decoration: underline;
+  text-underline-offset: var(--s-1);
+}
+
+.pay-link-label {
+  color: var(--indigo);
+  text-decoration: underline;
+  text-underline-offset: var(--s-1);
 }
 
 .toast {

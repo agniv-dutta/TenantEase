@@ -6,7 +6,7 @@ import LedgerTable from "../components/LedgerTable";
 import RegisterTabs from "../components/RegisterTabs";
 import TenantDrawer from "../components/TenantDrawer";
 import { ApiError } from "../lib/api";
-import { formatINR, monthShort } from "../lib/format";
+import { formatDate, formatINR, monthShort } from "../lib/format";
 import { useLedger, usePortfolioSummary } from "../lib/queries";
 
 const stampedThisSession = new Set<number>();
@@ -16,8 +16,7 @@ export default function LedgerPage() {
   const [riskFirst, setRiskFirst] = useState(true);
   const [needCallOnly, setNeedCallOnly] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
-  const [, forceRender] = useState(0);
-  const newlyStamped = useRef<number[]>([]);
+  const initialSequenceStarted = useRef(false);
 
   const summary = usePortfolioSummary();
   const ledger = useLedger(undefined, 6);
@@ -47,16 +46,10 @@ export default function LedgerPage() {
   const shouldAnimate = (leaseId: number) => !stampedThisSession.has(leaseId);
 
   useEffect(() => {
-    if (visible.length === 0) return;
-    newlyStamped.current = visible.map((r) => r.lease_id).filter((id) => !stampedThisSession.has(id));
-    if (newlyStamped.current.length > 0) {
-      const timer = window.setTimeout(() => {
-        newlyStamped.current.forEach((id) => stampedThisSession.add(id));
-        forceRender((n) => n + 1);
-      }, 900);
-      return () => window.clearTimeout(timer);
-    }
-  }, [visible]);
+    if (initialSequenceStarted.current || rows.length === 0) return;
+    initialSequenceStarted.current = true;
+    rows.forEach((row) => stampedThisSession.add(row.lease_id));
+  }, [rows]);
 
   const tabs = [{ id: "all", label: "All properties" }, ...properties];
 
@@ -65,7 +58,7 @@ export default function LedgerPage() {
       <h1 className="page-title">Khata</h1>
       <p className="soft">
         {summary.data
-          ? `${summary.data.active_leases} active leases · ${monthShort(summary.data.cycle_month)} cycle · expected collection ${formatINR(summary.data.expected_collection_inr)} of ${formatINR(summary.data.total_rent_due_inr)}`
+          ? `${summary.data.active_leases} active leases, ${monthShort(summary.data.cycle_month)} cycle, expected collection ${formatINR(summary.data.expected_collection_inr)} of ${formatINR(summary.data.total_rent_due_inr)}. Data as of ${formatDate(summary.data.as_of_date)}.`
           : "Loading portfolio…"}
       </p>
 
