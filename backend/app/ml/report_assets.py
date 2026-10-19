@@ -305,6 +305,10 @@ def render_eval_report(arts: dict[str, Any]) -> str:
     slices = arts["slices"]
     simulation = arts["simulation"]
     llm_eval = arts["llm_eval"]
+    choice = metrics.get(
+        "calibration_choice",
+        {"name": "isotonic", "reason": "Selected from validation metrics."},
+    )
 
     lines: list[str] = []
     lines.append("# Evaluation report")
@@ -468,7 +472,3 @@ if __name__ == "__main__":
     paths = main()
     for path in paths:
         print(f"Wrote {path}")
-    choice = metrics.get(
-        "calibration_choice",
-        {"name": "isotonic", "reason": "Selected from validation metrics."},
-    )
