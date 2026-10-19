@@ -38,7 +38,11 @@ def build_simulation(preds: pd.DataFrame | None = None) -> dict[str, Any]:
         actual_late_model = 0
         actual_late_baseline = 0
         for _, sub in preds.groupby("cycle_month"):
-            top_m = sub.nlargest(n, "m")
+            ranked = sub.sort_values(
+                by=["m_raw", "prev_cycle_outstanding_days", "lease_id"],
+                ascending=[False, False, True],
+            )
+            top_m = ranked.head(n)
             top_b = sub.nlargest(n, "b0")  # ties broken by lease id order
             model_picked_probs.extend(top_m["m"].tolist())
             baseline_picked_probs.extend(top_b["b0"].tolist())

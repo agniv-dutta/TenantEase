@@ -115,7 +115,9 @@ class RiskScore(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     lease_id: int = Field(foreign_key="leases.id", index=True)
     cycle_month: date = Field(index=True)
+    raw_score: float
     probability: float
     tier: str  # low | medium | high
+    prev_cycle_outstanding_days: float = 0.0
     top_factors_json: str = "[]"
     scored_at: datetime = Field(default_factory=_utcnow)

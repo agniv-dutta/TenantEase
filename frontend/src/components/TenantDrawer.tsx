@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { api, ApiError } from "../lib/api";
-import { formatINR, formatDate, weekdayDate } from "../lib/format";
+import { aboutPercentText, formatINR, formatDate, weekdayDate } from "../lib/format";
 import { useMaintenance, useTenant } from "../lib/queries";
 import type { Guardrail, Reminder } from "../lib/types";
 import RiskStroke from "./RiskStroke";
@@ -181,7 +181,12 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
           <hr className="rule" />
           <h3 className="subhead">Why this score</h3>
           <p className="score-line">
-            <RiskStroke probability={data.probability} tier={data.tier} seed={`d-${leaseId}`} />
+            <RiskStroke
+              probability={data.probability}
+              tier={data.tier}
+              seed={`d-${leaseId}`}
+              label={aboutPercentText(data.probability)}
+            />
             <span>chance this cycle is paid late.</span>
           </p>
           {data.top_factors.slice(0, 3).map((f) => (

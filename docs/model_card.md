@@ -32,8 +32,12 @@ preferred channel. Occupation type is included behind a config flag and ablated 
 | B1 logistic | 0.485 [0.354, 0.621] | 0.774 | 0.113 | 0.031 |
 | M LightGBM (raw) | 0.495 [0.355, 0.625] | 0.779 | 0.115 | 0.044 |
 | M LightGBM + isotonic | 0.448 [0.314, 0.571] | 0.778 | 0.113 | 0.053 |
+| M LightGBM + sigmoid (Platt) | 0.495 [0.355, 0.625] | 0.779 | 0.122 | 0.083 |
+| M LightGBM + smoothed isotonic | 0.495 [0.355, 0.625] | 0.779 | 0.116 | 0.053 |
+| M shipped calibrator (isotonic) | 0.448 [0.314, 0.571] | 0.778 | 0.113 | 0.053 |
 
-Isotonic calibration maps many distinct raw scores onto a few probability levels. That improves probability quality (Brier, ECE) but creates ties that reduce ranking metrics such as PR-AUC. The uncalibrated M is reported alongside the calibrated M for honesty.
+Shipped calibration: isotonic (M_lgbm_isotonic). Selected on validation set by lowest Brier score, with ECE as tie-breaker; PR-AUC is reported for ranking transparency.
+Ranking in product uses `raw_score`; calibrated probabilities are used for display, tiers and outlook simulation.
 
 Operating threshold (Youden's J on validation): 0.200.
 

@@ -1,8 +1,7 @@
 /** Risk shown as one wobbly pen stroke: its length is the probability, its
  *  colour is the tier. The stroke is seeded so a record always draws the same
- *  line. A percentage in tabular figures sits beside it for exact reading. */
+ *  line. */
 
-import { percent } from "../lib/format";
 import type { Tier } from "../lib/types";
 
 const TIER_INK: Record<Tier, string> = {
@@ -24,9 +23,10 @@ interface RiskStrokeProps {
   tier: Tier;
   seed: string;
   width?: number;
+  label?: string;
 }
 
-export default function RiskStroke({ probability, tier, seed, width = 96 }: RiskStrokeProps) {
+export default function RiskStroke({ probability, tier, seed, width = 96, label }: RiskStrokeProps) {
   const end = 2 + width * Math.max(0, Math.min(1, probability));
   const wobble = (i: number) => ((hash(seed + i) % 7) - 3) * 0.9;
   const mid1 = 2 + (end - 2) * 0.34;
@@ -38,7 +38,7 @@ export default function RiskStroke({ probability, tier, seed, width = 96 }: Risk
       <svg width={width + 4} height="18" viewBox={`0 0 ${width + 4} 18`} aria-hidden="true">
         <path d={d} fill="none" stroke={TIER_INK[tier]} strokeWidth="5" strokeLinecap="round" opacity="0.85" />
       </svg>
-      <span className="num">{percent(probability)}</span>
+      {label ? <span className="num">{label}</span> : null}
     </span>
   );
 }
