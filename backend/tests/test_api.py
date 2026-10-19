@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
+from app.db import engine
 from app.main import app
+from app.models import RiskScore
 
 
 @pytest.fixture(scope="module")
@@ -45,6 +48,21 @@ def test_ledger_rows_and_filter(client: TestClient) -> None:
     pid = row["property_id"]
     r2 = client.get(f"/api/ledger?property_id={pid}")
     assert all(x["property_id"] == pid for x in r2.json()["rows"])
+
+
+def test_risk_ranking_distinct_and_stable(client: TestClient) -> None:
+    """Raw score ranking is mostly distinct and deterministic."""
+    first = client.get("/api/ledger?months=6").json()["rows"]
+    second = client.get("/api/ledger?months=6").json()["rows"]
+    first_ids = [row["lease_id"] for row in first]
+    second_ids = [row["lease_id"] for row in second]
+    assert first_ids == second_ids
+
+    with Session(engine) as session:
+        scores = session.exec(select(RiskScore)).all()
+    raw_values = [round(float(s.raw_score), 8) for s in scores]
+    distinct_share = len(set(raw_values)) / max(1, len(raw_values))
+    assert distinct_share >= 0.90
 
 
 def test_ledger_invalid_months(client: TestClient) -> None:
@@ -98,6 +116,11 @@ def test_model_card(client: TestClient) -> None:
     assert r.status_code == 200
     body = r.json()
     assert "models" in body["metrics"]
+    choice = body["metrics"].get("calibration_choice")
+    if choice:
+        shipped = body["metrics"]["models"]["M_lgbm_shipped"]["brier"]
+        isotonic = body["metrics"]["models"]["M_lgbm_isotonic"]["brier"]
+        assert shipped <= isotonic + 0.002
     assert "synthetic" in body["card_markdown"].lower() or "synthetic" in body["metrics"].get("note", "").lower()
 
 

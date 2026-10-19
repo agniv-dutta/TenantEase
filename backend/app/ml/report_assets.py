@@ -135,16 +135,18 @@ def fig_pr_curves(preds: pd.DataFrame, metrics: dict, figures_dir: Path) -> Path
 
     test = preds[preds["split"] == "test"]
     fig, ax = plt.subplots(figsize=(6, 5))
+    shipped_key = metrics.get("shipped_model_key", "M_lgbm_isotonic")
+    shipped_name = metrics.get("calibration_choice", {}).get("name", "isotonic")
     series = [
         ("B0 rule baseline", "b0", HALDI),
         ("B1 logistic", "b1", VERDIGRIS),
-        ("M LightGBM", "m", INDIGO),
+        (f"M LightGBM ({shipped_name})", "m", INDIGO),
     ]
     for label, col, color in series:
         precision, recall, _ = precision_recall_curve(test["is_late"], test[col])
-        pr_auc = metrics["models"][
-            {"b0": "B0_rule_baseline", "b1": "B1_logistic", "m": "M_lgbm_isotonic"}[col]
-        ]["pr_auc"]
+        pr_auc = metrics["models"][{"b0": "B0_rule_baseline", "b1": "B1_logistic", "m": shipped_key}[col]][
+            "pr_auc"
+        ]
         ax.plot(recall, precision, color=color, linewidth=2, label=f"{label} (PR-AUC {pr_auc:.3f})")
     ax.axhline(test["is_late"].mean(), color=RULE, linestyle="--", linewidth=1)
     ax.set_xlabel("Recall")
@@ -156,12 +158,14 @@ def fig_pr_curves(preds: pd.DataFrame, metrics: dict, figures_dir: Path) -> Path
 
 
 def fig_calibration(metrics: dict, figures_dir: Path) -> Path:
-    """3. Calibration before and after isotonic."""
+    """3. Calibration before and after calibration methods."""
     fig, ax = plt.subplots(figsize=(5.5, 5.5))
     ax.plot([0, 1], [0, 1], color=RULE, linestyle="--", linewidth=1, label="Perfect")
     for key, color, label in [
         ("M_lgbm_raw", HALDI, "M raw"),
         ("M_lgbm_isotonic", INDIGO, "M isotonic"),
+        ("M_lgbm_sigmoid", VERDIGRIS, "M sigmoid"),
+        ("M_lgbm_smoothed", STAMP_RED, "M smoothed"),
     ]:
         curve = metrics["models"][key]["calibration_curve"]
         x = [c["mean_predicted"] for c in curve]
@@ -169,7 +173,7 @@ def fig_calibration(metrics: dict, figures_dir: Path) -> Path:
         ax.plot(x, y, marker="o", color=color, linewidth=2, label=label)
     ax.set_xlabel("Predicted probability")
     ax.set_ylabel("Observed late rate")
-    ax.set_title("Calibration before and after isotonic")
+    ax.set_title("Calibration comparison")
     ax.legend(frameon=False, fontsize=9)
     _clean(ax)
     return _save(fig, figures_dir, "03_calibration.png")
@@ -177,14 +181,16 @@ def fig_calibration(metrics: dict, figures_dir: Path) -> Path:
 
 def fig_topk_capture(metrics: dict, figures_dir: Path) -> Path:
     """4. Top-k follow-up capture vs the rule baseline."""
-    ks = list(metrics["models"]["M_lgbm_isotonic"]["top_k"].keys())
-    m_recall = [metrics["models"]["M_lgbm_isotonic"]["top_k"][k]["recall"] for k in ks]
+    shipped_key = metrics.get("shipped_model_key", "M_lgbm_isotonic")
+    ks = list(metrics["models"][shipped_key]["top_k"].keys())
+    m_recall = [metrics["models"][shipped_key]["top_k"][k]["recall"] for k in ks]
     b0_recall = [metrics["models"]["B0_rule_baseline"]["top_k"][k]["recall"] for k in ks]
     x = np.arange(len(ks))
     width = 0.38
     fig, ax = plt.subplots(figsize=(7, 3.8))
     ax.bar(x - width / 2, b0_recall, width, color=HALDI, label="B0 rule baseline")
-    ax.bar(x + width / 2, m_recall, width, color=INDIGO, label="M LightGBM")
+    shipped_name = metrics.get("calibration_choice", {}).get("name", "isotonic")
+    ax.bar(x + width / 2, m_recall, width, color=INDIGO, label=f"M LightGBM ({shipped_name})")
     ax.set_xticks(x, [f"top {k}%" for k in ks])
     ax.set_ylabel("Share of lates captured")
     ax.set_title("Follow-up capture by capacity")
@@ -299,6 +305,10 @@ def render_eval_report(arts: dict[str, Any]) -> str:
     slices = arts["slices"]
     simulation = arts["simulation"]
     llm_eval = arts["llm_eval"]
+    choice = metrics.get(
+        "calibration_choice",
+        {"name": "isotonic", "reason": "Selected from validation metrics."},
+    )
 
     lines: list[str] = []
     lines.append("# Evaluation report")
@@ -320,6 +330,9 @@ def render_eval_report(arts: dict[str, Any]) -> str:
         "B1_logistic": "B1 logistic",
         "M_lgbm_raw": "M LightGBM (raw)",
         "M_lgbm_isotonic": "M LightGBM (isotonic)",
+        "M_lgbm_sigmoid": "M LightGBM (sigmoid/Platt)",
+        "M_lgbm_smoothed": "M LightGBM (smoothed isotonic)",
+        "M_lgbm_shipped": f"M shipped ({choice['name']})",
     }
     for key, label in labels.items():
         m = metrics["models"][key]
@@ -328,6 +341,7 @@ def render_eval_report(arts: dict[str, Any]) -> str:
         )
     lines.append("")
     lines.append(metrics["calibration_note"])
+    lines.append(f"Shipped calibration: {choice['name']}. {choice['reason']}")
     lines.append("")
     lines.append("## Ablation (occupation removed)")
     lines.append("")
@@ -336,11 +350,12 @@ def render_eval_report(arts: dict[str, Any]) -> str:
     lines.append("")
     lines.append("## Follow-up capacity (top share of leases per cycle)")
     lines.append("")
-    ks = list(metrics["models"]["M_lgbm_isotonic"]["top_k"])
+    shipped_key = metrics.get("shipped_model_key", "M_lgbm_isotonic")
+    ks = list(metrics["models"][shipped_key]["top_k"])
     lines.append("| Share | " + " | ".join(f"{k}%" for k in ks) + " |")
     lines.append("|---" * (len(ks) + 1) + "|")
     for metric_name in ("precision", "recall"):
-        vals = [metrics["models"]["M_lgbm_isotonic"]["top_k"][k][metric_name] for k in ks]
+        vals = [metrics["models"][shipped_key]["top_k"][k][metric_name] for k in ks]
         label = metric_name.capitalize()
         lines.append(f"| {label} | " + " | ".join(f"{v:.3f}" for v in vals) + " |")
     lines.append("")
@@ -407,7 +422,7 @@ def render_eval_report(arts: dict[str, Any]) -> str:
     lines.append("")
     lines.append("- Synthetic data with planted effects; do not read these as production accuracy.")
     lines.append("- Small test set, so slice gaps and confidence intervals are noisy.")
-    lines.append("- Isotonic calibration trades ranking (PR-AUC) for probability quality (Brier, ECE).")
+    lines.append("- Ranking uses raw scores while display and simulation use calibrated probabilities.")
     lines.append("- The simulation is assumption-based; it does not measure behaviour change.")
     lines.append("- Reminder messages are drafts; a human approves every one before it is sent.")
     lines.append("- Maintenance triage is keyword/LLM assisted; an emergency is always escalated but a "

@@ -26,3 +26,11 @@ export function weekdayDate(iso: string): string {
 export function percent(p: number): string {
   return `${Math.round(p * 100)}%`;
 }
+
+export function roundedPercent5(p: number): number {
+  return Math.max(0, Math.min(100, Math.round((p * 100) / 5) * 5));
+}
+
+export function aboutPercentText(p: number): string {
+  return `about ${roundedPercent5(p)} percent`;
+}

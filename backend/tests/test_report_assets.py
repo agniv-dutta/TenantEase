@@ -41,6 +41,8 @@ def test_render_eval_report_has_sections(tmp_path: Path):
         "operating_threshold": 0.2,
         "calibration_note": "note",
         "ablation_no_occupation": {"pr_auc": 0.1, "roc_auc": 0.6},
+        "shipped_model_key": "M_lgbm_shipped",
+        "calibration_choice": {"name": "smoothed_isotonic_sigmoid", "reason": "lowest brier"},
         "models": {
             k: {
                 "pr_auc": 0.3,
@@ -50,7 +52,15 @@ def test_render_eval_report_has_sections(tmp_path: Path):
                 "top_k": {"5": {"precision": 0.5, "recall": 0.2}},
                 "calibration_curve": [{"mean_predicted": 0.1, "fraction_positive": 0.1, "n": 2}],
             }
-            for k in ("B0_rule_baseline", "B1_logistic", "M_lgbm_raw", "M_lgbm_isotonic")
+            for k in (
+                "B0_rule_baseline",
+                "B1_logistic",
+                "M_lgbm_raw",
+                "M_lgbm_isotonic",
+                "M_lgbm_sigmoid",
+                "M_lgbm_smoothed",
+                "M_lgbm_shipped",
+            )
         },
     }
     slices = {
@@ -99,5 +109,5 @@ def test_main_writes_figures_and_report(tmp_path: Path):
     assert "Evaluation report" in body
     # every referenced metric comes from the artifact files
     metrics = json.loads((ARTIFACTS / "metrics.json").read_text(encoding="utf-8"))
-    assert f"{metrics['models']['M_lgbm_isotonic']['pr_auc']:.3f}" in body
+    assert f"{metrics['models']['M_lgbm_shipped']['pr_auc']:.3f}" in body
     assert any(p == report for p in written)
