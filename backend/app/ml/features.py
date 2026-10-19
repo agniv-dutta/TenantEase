@@ -1,8 +1,10 @@
 """Leak-safe as-of feature pipeline.
 
 One training row is built per (lease, cycle). The ``as_of`` timestamp for a
-row is that cycle's due date minus 7 days. Features may only use information
-whose timestamp is <= ``as_of``:
+row is that cycle's due date minus 7 days (the moment the reminder for that
+cycle would be decided), and it is never later than the demo clock
+``clock.today()``: scoring cannot see anything after ``DEMO_TODAY``. Features
+may only use information whose timestamp is <= ``as_of``:
 
 * A payment whose ``paid_date`` is after ``as_of`` (or NULL) counts as
   outstanding; the feature value becomes elapsed days since its due date.
@@ -27,6 +29,7 @@ import numpy as np
 import pandas as pd
 from sqlmodel import Session, select
 
+from app import clock
 from app.config import settings
 from app.models import Lease, Payment, Tenant, Unit
 
@@ -382,7 +385,7 @@ def _row_for_cycle(ctx: _LeaseContext, cycle: date, include_target: bool) -> dic
         if ctx.lease.end_date is not None and ctx.lease.end_date < cycle:
             return None
         return None
-    as_of = due.due_date - timedelta(days=7)
+    as_of = min(due.due_date - timedelta(days=7), clock.today())
 
     priors = [p for p in ctx.payments if p.cycle_month < cycle]
     obs: list[tuple[float, bool, Payment]] = []

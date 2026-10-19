@@ -80,6 +80,39 @@ def bootstrap_ci(y: np.ndarray, p: np.ndarray, lease_ids: np.ndarray, metric_fn,
     return [round(float(np.percentile(stats, 2.5)), 4), round(float(np.percentile(stats, 97.5)), 4)]
 
 
+def paired_bootstrap_comparison(
+    y: np.ndarray,
+    p_a: np.ndarray,
+    p_b: np.ndarray,
+    lease_ids: np.ndarray,
+    n_boot: int = N_BOOT,
+) -> dict[str, dict[str, Any]]:
+    """Estimate paired metric differences (A minus B) using whole leases."""
+    metrics = {
+        "pr_auc": average_precision_score,
+        "roc_auc": roc_auc_score,
+        "brier": brier_score_loss,
+    }
+    unique = np.unique(lease_ids)
+    rng = np.random.default_rng(SEED)
+    boot_stats: dict[str, list[float]] = {name: [] for name in metrics}
+    for _ in range(n_boot):
+        chosen = rng.choice(unique, size=len(unique), replace=True)
+        idx = np.concatenate([np.flatnonzero(lease_ids == lid) for lid in chosen])
+        if len(np.unique(y[idx])) < 2:
+            continue
+        for name, metric_fn in metrics.items():
+            boot_stats[name].append(float(metric_fn(y[idx], p_a[idx]) - metric_fn(y[idx], p_b[idx])))
+
+    result: dict[str, dict[str, Any]] = {}
+    for name, metric_fn in metrics.items():
+        point = float(metric_fn(y, p_a) - metric_fn(y, p_b))
+        samples = boot_stats[name]
+        interval = np.percentile(samples, [2.5, 97.5]) if samples else [np.nan, np.nan]
+        result[name] = {"estimate": round(point, 4), "ci95": [round(float(interval[0]), 4), round(float(interval[1]), 4)]}
+    return result
+
+
 def model_metrics(y: np.ndarray, p: np.ndarray, lease_ids: np.ndarray, cycles: pd.Series) -> dict[str, Any]:
     """All headline metrics for one model on the test set."""
     ece, curve = expected_calibration_error(y, p)
@@ -208,6 +241,14 @@ def main() -> None:
             "M_lgbm_raw": model_metrics(y, preds["m_raw"].to_numpy(), lease_ids, preds["cycle_month"]),
             "M_lgbm_isotonic": model_metrics(y, preds["m"].to_numpy(), lease_ids, preds["cycle_month"]),
         },
+        "paired_comparisons": {
+            "M_lgbm_raw_minus_B1_logistic": paired_bootstrap_comparison(
+                y, preds["m_raw"].to_numpy(), preds["b1"].to_numpy(), lease_ids
+            ),
+            "M_lgbm_raw_minus_B0_rule_baseline": paired_bootstrap_comparison(
+                y, preds["m_raw"].to_numpy(), preds["b0"].to_numpy(), lease_ids
+            ),
+        },
         "calibration_note": (
             "Isotonic calibration maps many distinct raw scores onto a few "
             "probability levels. That improves probability quality (Brier, ECE) "
@@ -263,6 +304,10 @@ def render_model_card(metrics: dict, slices: dict) -> str:
         "Never use this score for eviction, rent pricing, tenant screening, or any",
         "decision about a person. It only decides who gets an earlier or more",
         "personal nudge.",
+        "",
+        "## Why this model",
+        "",
+        "The synthetic process uses logistic effects, so near parity between logistic regression and boosted trees is expected. Logistic coefficients are directly readable; SHAP explanations for LightGBM are an approximation. Boosting was kept because it handles missing values and interactions without manual feature engineering, and the pipeline is the thing being demonstrated. Paired lease bootstrap comparisons are reported in metrics.json.",
         "",
         "## Data",
         "",

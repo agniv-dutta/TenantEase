@@ -26,6 +26,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlmodel import Session
 
+from app import clock
 from app.db import engine
 from app.ml.features import build_training_frame, feature_columns
 
@@ -44,6 +45,11 @@ def load_training_dataframe() -> pd.DataFrame:
         raise FileNotFoundError("No data found. Run `make seed` first.")
     # Drop the open cycle: its outcome is unknown (no paid_date yet).
     cycles = sorted(df["cycle_month"].unique())
+    if pd.Timestamp(cycles[-1]) != pd.Timestamp(clock.open_cycle()):
+        raise FileNotFoundError(
+            f"The newest cycle {pd.Timestamp(cycles[-1]).date()} is not the open cycle "
+            f"{clock.open_cycle().isoformat()}; run `make seed`."
+        )
     closed = cycles[:-1]
     df = df[df["cycle_month"].isin(closed)].copy()
     df = df.sort_values(["cycle_month", "lease_id"]).reset_index(drop=True)

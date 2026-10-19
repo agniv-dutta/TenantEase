@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
@@ -15,6 +16,11 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{BACKEND_ROOT / 'data' / 'khata.db'}"
     seed: int = 42
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    # The demo's clock. The seed lays the whole synthetic calendar out around
+    # this date and the app never reads the wall clock, so `make seed`,
+    # `make demo` and the screenshots are reproducible for a given seed.
+    demo_today: date = date(2026, 10, 19)
 
     # Risk tiers
     tier_low_max: float = 0.20

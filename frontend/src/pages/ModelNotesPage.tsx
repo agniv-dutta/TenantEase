@@ -25,6 +25,20 @@ interface Metrics {
   models: Record<string, ModelMetrics>;
   calibration_note: string;
   ablation_no_occupation: { pr_auc: number; roc_auc: number };
+  paired_comparisons: Record<string, Record<string, { estimate: number; ci95: [number, number] }>>;
+}
+
+function comparisonText(
+  comparison: Record<string, { estimate: number; ci95: [number, number] }>,
+  baseline: string,
+): string {
+  const pr = comparison.pr_auc;
+  const roc = comparison.roc_auc;
+  const brier = comparison.brier;
+  const prResult = pr.ci95[0] <= 0 && pr.ci95[1] >= 0
+    ? "On this data we cannot tell the two models apart. The synthetic data was built with logistic effects, so this is expected. Boosted trees would be worth testing on real data with nonlinear patterns."
+    : `For PR-AUC, ${pr.estimate > 0 ? "LightGBM" : baseline} is better by ${Math.abs(pr.estimate).toFixed(3)} (paired difference M minus ${baseline}: ${pr.estimate.toFixed(3)}, 95% interval ${pr.ci95[0].toFixed(3)} to ${pr.ci95[1].toFixed(3)}).`;
+  return `${prResult} ROC-AUC difference (M minus ${baseline}) is ${roc.estimate.toFixed(3)} (95% interval ${roc.ci95[0].toFixed(3)} to ${roc.ci95[1].toFixed(3)}); Brier difference is ${brier.estimate.toFixed(3)} (95% interval ${brier.ci95[0].toFixed(3)} to ${brier.ci95[1].toFixed(3)}).`;
 }
 
 interface SliceBucket {
@@ -106,6 +120,17 @@ export default function ModelNotesPage() {
       {data && metrics && (
         <>
           <p className="notice">{metrics.note}</p>
+
+          <h2 className="section-title">Is the complex model worth it?</h2>
+          <p>
+            {comparisonText(metrics.paired_comparisons.M_lgbm_raw_minus_B1_logistic, "B1 logistic")}
+          </p>
+          <p>
+            Product comparison with today’s rule behavior (B0): {comparisonText(
+              metrics.paired_comparisons.M_lgbm_raw_minus_B0_rule_baseline,
+              "B0 rule baseline",
+            )}
+          </p>
 
           <h2 className="section-title">Model comparison</h2>
           <table className="data">

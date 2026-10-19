@@ -38,6 +38,7 @@ class PortfolioSummary(BaseModel):
     total_rent_due_inr: int
     tiers: TierCounts
     cycle_month: date
+    as_of_date: date
 
 
 class PaymentCell(BaseModel):
@@ -201,6 +202,7 @@ class OutlookResponse(BaseModel):
     total_due: int
     points: list[OutlookPoint]
     likely_late_count: int
+    as_of_date: date
 
 
 class ModelCardResponse(BaseModel):

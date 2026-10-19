@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
+from app import clock
 from app.db import get_session
 from app.llm.drafter import draft_message
 from app.llm.guardrails import check_all
@@ -53,14 +54,18 @@ def build_plan(tier: str, preferred_channel: str, due_date: date, has_overdue: b
 
 
 def _open_cycle_and_due(session: Session, lease_id: int) -> tuple[date, date, int]:
-    """Return (open_cycle, due_date, amount) for a lease's current cycle."""
+    """Return (open cycle, due date, amount) for a lease's current cycle."""
     payments = session.exec(
         select(Payment).where(Payment.lease_id == lease_id).order_by(Payment.cycle_month)
     ).all()
-    if not payments:
-        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "No payments for this lease."})
-    latest = payments[-1]
-    return latest.cycle_month, latest.due_date, latest.amount
+    open_cycle = clock.open_cycle()
+    current = next((p for p in payments if p.cycle_month == open_cycle), None)
+    if current is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "message": "This lease has no bill for the open cycle."},
+        )
+    return current.cycle_month, current.due_date, current.amount
 
 
 def _has_overdue(session: Session, lease_id: int, before: date) -> bool:
@@ -191,7 +196,7 @@ def approve_reminder(reminder_id: int, session: Session = Depends(get_session)) 
     if reminder is None:
         raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Reminder not found."})
     reminder.status = "approved"
-    reminder.approved_at = datetime.now(timezone.utc)
+    reminder.approved_at = clock.now()
     session.add(reminder)
     session.commit()
     session.refresh(reminder)

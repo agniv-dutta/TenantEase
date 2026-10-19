@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from app.ml.evaluate import expected_calibration_error, gap_flags, model_metrics, top_k_metrics
+from app.ml.evaluate import expected_calibration_error, gap_flags, model_metrics, paired_bootstrap_comparison, top_k_metrics
 
 
 def test_ece_perfect_predictions() -> None:
@@ -51,3 +51,17 @@ def test_model_metrics_keys() -> None:
     for key in ("pr_auc", "pr_auc_ci", "roc_auc", "roc_auc_ci", "brier", "brier_ci", "ece", "calibration_curve", "top_k"):
         assert key in out
     assert len(out["pr_auc_ci"]) == 2
+
+
+def test_paired_bootstrap_comparison_returns_point_and_interval() -> None:
+    """Paired lease bootstrap reports finite estimates and 95% intervals."""
+    y = np.array([0, 1, 0, 1, 1, 0, 1, 0])
+    p_a = np.array([0.1, 0.8, 0.2, 0.7, 0.9, 0.3, 0.6, 0.4])
+    p_b = np.array([0.2, 0.7, 0.3, 0.6, 0.8, 0.4, 0.5, 0.5])
+    leases = np.repeat(np.arange(4), 2)
+    result = paired_bootstrap_comparison(y, p_a, p_b, leases, n_boot=100)
+    assert set(result) == {"pr_auc", "roc_auc", "brier"}
+    for values in result.values():
+        assert set(values) == {"estimate", "ci95"}
+        assert len(values["ci95"]) == 2
+        assert values["ci95"][0] <= values["ci95"][1]

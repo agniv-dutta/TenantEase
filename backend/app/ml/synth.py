@@ -29,14 +29,15 @@ import argparse
 import calendar
 import math
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
 from faker import Faker
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.models import Lease, Payment, Property, Tenant, Unit
+from app import clock
+from app.models import Lease, Meta, Payment, Property, Tenant, Unit
 
 LOCALITIES = [
     ("Mansarovar", 1.00),
@@ -171,7 +172,9 @@ def build_structure(seed: int, n_closed_cycles: int, open_cycle: date) -> tuple[
                 )
             )
 
-    window_start = month_add(open_cycle, -(n_closed_cycles + 1))
+    # Leases can start from the first closed cycle; every cycle in the window
+    # then has a tenant from day one.
+    window_start = month_add(open_cycle, -n_closed_cycles)
     tenants: list[Tenant] = []
     spells: list[LeaseSpell] = []
 
@@ -358,12 +361,18 @@ def tune_intercept(
     return (lo + hi) / 2
 
 
-def write_db(db_path: str, seed: int) -> dict[str, int]:
-    """Generate the full synthetic database at ``db_path``. Idempotent."""
-    today = date.today()
-    open_cycle = today.replace(day=1)
+def write_db(db_path: str, seed: int) -> dict[str, int | str]:
+    """Generate the full synthetic database at ``db_path``. Idempotent.
+
+    The calendar is laid out around ``DEMO_TODAY`` (see :mod:`app.clock`): the
+    open cycle is the month containing it and the closed cycles are the
+    contiguous months before it, so the ledger never skips a month. The seed
+    records the demo date in the ``meta`` table.
+    """
+    open_cycle = clock.open_cycle()
+    demo_today = clock.today()
     n_closed_cycles = 24
-    cycles = [month_add(open_cycle, -(n_closed_cycles + 1 - i)) for i in range(n_closed_cycles)]
+    cycles = [month_add(open_cycle, -(n_closed_cycles - i)) for i in range(n_closed_cycles)]
 
     properties, units, tenants, spells = build_structure(seed, n_closed_cycles, open_cycle)
     intercept = tune_intercept(units, tenants, spells, cycles, seed)
@@ -378,6 +387,11 @@ def write_db(db_path: str, seed: int) -> dict[str, int]:
 
     n_payments = 0
     with Session(engine) as session:
+        # Record what the data was generated for: same seed, same demo date.
+        session.add(Meta(key="demo_today", value=demo_today.isoformat()))
+        session.add(Meta(key="seed", value=str(seed)))
+        session.commit()
+
         for p in properties:
             session.add(p)
         for u in units:
@@ -443,6 +457,7 @@ def write_db(db_path: str, seed: int) -> dict[str, int]:
         "leases": len(spells),
         "payments": n_payments,
         "closed_cycles": n_closed_cycles,
+        "demo_today": demo_today.isoformat(),
         "base_rate": round(base_rate(outcomes), 4),
         "intercept": round(intercept, 4),
     }
@@ -455,7 +470,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--out", type=str, default="data/khata.db")
     args = parser.parse_args(argv)
     stats = write_db(args.out, args.seed)
-    print(f"Wrote {args.out} at {datetime.utcnow().isoformat(timespec='seconds')}Z")
+    print(f"Wrote {args.out} for demo date {stats['demo_today']} (seed {args.seed})")
     for k, v in stats.items():
         print(f"  {k}: {v}")
 

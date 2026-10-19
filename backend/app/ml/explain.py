@@ -11,17 +11,20 @@ import joblib
 import numpy as np
 import pandas as pd
 import shap
-from sqlmodel import Session, select
+from sqlmodel import Session
 
+from app import clock
 from app.db import engine
 from app.ml.features import build_current_frame, render_feature_sentence
 from app.ml.train import ARTIFACTS
-from app.models import Payment
 
 
 def load_model() -> dict:
     """Load the trained model bundle."""
-    return joblib.load(ARTIFACTS / "model.joblib")
+    path = ARTIFACTS / "model.joblib"
+    if not path.exists():
+        raise FileNotFoundError("No trained model yet; run `make train` first.")
+    return joblib.load(path)
 
 
 def render_factor(feature: str, row: object, shap_value: float) -> dict[str, Any]:
@@ -72,8 +75,7 @@ def build_shap_artifact(cycle_month: date | None = None) -> Path:
     bundle = load_model()
     with Session(engine) as session:
         if cycle_month is None:
-            cycles = sorted({p.cycle_month for p in session.exec(select(Payment)).all()})
-            cycle_month = cycles[-1]
+            cycle_month = clock.open_cycle()
         frame, _ = build_current_frame(session, cycle_month)
     if frame.empty:
         result: dict[str, Any] = {"cycle_month": str(cycle_month), "leases": {}}

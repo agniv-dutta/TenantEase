@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import calendar
 from datetime import date
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
+from app import clock
 from app.db import get_session
 from app.ml.scoring import current_cycle
 from app.models import Lease, Payment, Property, RiskScore
@@ -16,6 +18,16 @@ from app.schemas import OutlookPoint, OutlookResponse, PortfolioSummary, TierCou
 router = APIRouter()
 
 MC_DRAWS = 500
+
+
+def _as_of_for(target: date) -> date:
+    """The demo date, capped at the last day of the cycle being viewed.
+
+    The open cycle is observed up to ``DEMO_TODAY``; an older cycle was
+    already fully observed by then.
+    """
+    last_day = date(target.year, target.month, calendar.monthrange(target.year, target.month)[1])
+    return min(clock.today(), last_day)
 
 
 def _active_leases(session: Session, cycle: date) -> list[Lease]:
@@ -53,6 +65,7 @@ def summary(session: Session = Depends(get_session)) -> PortfolioSummary:
         total_rent_due_inr=total_due,
         tiers=TierCounts(**counts),
         cycle_month=cycle,
+        as_of_date=clock.today(),
     )
 
 
@@ -105,6 +118,7 @@ def outlook(cycle: str | None = None, session: Session = Depends(get_session)) -
         total_due=int(amounts.sum()),
         points=points,
         likely_late_count=likely_late,
+        as_of_date=_as_of_for(target),
     )
 
 

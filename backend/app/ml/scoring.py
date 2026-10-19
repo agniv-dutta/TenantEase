@@ -6,6 +6,7 @@ from datetime import date
 
 from sqlmodel import Session, select
 
+from app import clock
 from app.config import settings
 from app.ml.explain import explain_frame, load_model
 from app.ml.features import build_current_frame
@@ -22,11 +23,24 @@ def tier_for(probability: float) -> str:
 
 
 def current_cycle(session: Session) -> date:
-    """The open cycle is the latest cycle_month present in payments."""
-    cycles = sorted({p.cycle_month for p in session.exec(select(Payment)).all()})
-    if not cycles:
-        raise FileNotFoundError("No payments found. Run `make seed` first.")
-    return cycles[-1]
+    """The open cycle: the month containing ``DEMO_TODAY``.
+
+    The ledger shows this cycle plus the six closed months before it, so the
+    seed must contain all of them. If a month is missing the data is stale and
+    the fix belongs in ``make seed``, never in this query.
+    """
+    required = clock.recent_cycles()
+    present = set(
+        session.exec(select(Payment.cycle_month).where(Payment.cycle_month.in_(required))).all()
+    )
+    missing = [cycle for cycle in required if cycle not in present]
+    if missing:
+        months = ", ".join(c.month_name() + " " + str(c.year) for c in reversed(missing))
+        raise FileNotFoundError(
+            f"The data has no payments for {months}; it does not cover the open "
+            f"cycle {required[0].isoformat()}. Reseed the database with `make seed`."
+        )
+    return required[0]
 
 
 def score_open_cycle(session: Session, cycle_month: date | None = None) -> int:
