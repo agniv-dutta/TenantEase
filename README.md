@@ -4,7 +4,7 @@ TenantEase Khata is a synthetic-data prototype for rent collection: it turns a m
 
 **Live demo:** Not deployed. Run the local demo with the commands below. Set the link here when a public deployment is available.
 
-**Colab:** [Reproduce the synthetic model evaluation](https://colab.research.google.com/github/agniv-dutta/TenantEase/blob/main/notebooks/tenantease_demo.ipynb)
+**Colab:** [Reproduce the synthetic model evaluation](https://colab.research.google.com/github/agniv-dutta/TenantEase/blob/main/notebooks/tenantease_demo.ipynb) · [Full risk-model walkthrough](https://colab.research.google.com/github/agniv-dutta/TenantEase/blob/main/notebooks/tenantease_risk_model.ipynb)
 
 ## Evaluation metrics
 
@@ -99,4 +99,5 @@ The model and parser are evaluated on synthetic, planted data. This does not est
 - [Evaluation report](docs/eval_report.md)
 - [Submission checklist](docs/submission_checklist.md)
 - [Colab notebook source](notebooks/tenantease_demo.ipynb)
+- [Risk-model notebook source](notebooks/tenantease_risk_model.ipynb)
 - [Screenshots](docs/screenshots/)

@@ -15,3 +15,5 @@ backend/app/ml/artifacts/*.md
 venv/
 docs/figures/*.png
 docs/screenshots/*.png
+docs/screen-recordings/
+*.log
