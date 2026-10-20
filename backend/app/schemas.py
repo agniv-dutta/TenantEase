@@ -241,6 +241,12 @@ class PaymentRecordResponse(BaseModel):
     flags: list[str] = Field(default_factory=list)
 
 
+class ReminderEditRequest(BaseModel):
+    """Replacement text for a draft reminder awaiting approval."""
+
+    message: str
+
+
 class ParsedFields(BaseModel):
     """Structured fields pulled from a pasted message."""
 

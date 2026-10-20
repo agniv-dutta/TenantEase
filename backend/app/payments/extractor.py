@@ -78,8 +78,8 @@ AMOUNT_RE = re.compile(
     r"(?:₹|rs\.?|inr|rupees?|रुपये|रु\.?)\s*([\d][\d,\s]*(?:\.\d{1,2})?)\s*(?:/-|/)?",
     re.IGNORECASE,
 )
-# A bare number that still looks like money: 4+ digits, optional Indian commas.
-BARE_AMOUNT_RE = re.compile(r"\b(\d{1,2}(?:,\d{2}){1,3}|\d{4,7})\b")
+# A bare number that still looks like money: 4+ digits, optional commas.
+BARE_AMOUNT_RE = re.compile(r"\b(\d{1,3}(?:,\d{2,3})+(?:\.\d{1,2})?|\d{4,7})\b")
 
 
 def _to_int(value: str) -> int | None:
@@ -189,10 +189,12 @@ def _find_date(text: str) -> date | None:
 
 # UPI/bank reference numbers are alphanumeric ids of 6-22 chars, often labelled.
 REF_LABELLED_RE = re.compile(
-    r"(?:utr|ref(?:erence)?|txn|transaction|order|rrn|upi ref)[\s:#.-]*([A-Za-z0-9]{6,22})",
+    r"(?:utr|ref(?:erence)?|txn|transaction|order|rrn|upi\s*ref|txn\s*id|order\s*id|"
+    r"ref\s*no|नेफ्ट|रेफ|ऑर्डर|यूटीआर)"
+    r"[\s:#.\-]*(?:id|no|number|संदर्भ)?[\s:#.\-]*([A-Za-z0-9]{6,22})",
     re.IGNORECASE,
 )
-REF_BARE_RE = re.compile(r"\b([A-Z]{2,5}\d{6,16}|\d{10,16})\b")
+REF_BARE_RE = re.compile(r"\b([A-Z]{2,5}\d{6,16}|\d{8,16})\b")
 
 
 def _find_reference(text: str) -> str | None:
@@ -211,6 +213,9 @@ def _find_reference(text: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 DEVANAGARI_RE = re.compile(r"[ऀ-ॿ]")
+# A unit label like "MAN-02" or "MAL-07" that tenants often quote in a message.
+UNIT_LABEL_RE = re.compile(r"\b([A-Z]{3}-\d{1,3})\b")
+DEVANAGARI_NAME_RE = re.compile(r"[ऀ-ॿ]{3,}")
 HINGLISH_HINTS = (
     "bhej", "bheja", "jama", "kiraya", "kar diya", "kar di", "hua", "aaya",
     "bhai", "kaun", "hai", "ho gaya", "paisa", "paise", "bhar diya", "de diya",
@@ -237,11 +242,24 @@ NAME_STOPWORDS = {
     "you", "your", "has", "have", "been", "the", "this", "that", "with", "and",
     "successful", "success", "transaction", "txn", "order", "ref", "reference",
     "utr", "aap", "aapka", "ne", "ko", "ka", "ki", "account", "new", "today",
-    "yesterday", "now", "message", "alert", "ok", "okay", "rtgs", "nach", "imps",
-    "rupee", "paid.", "credit", "debit", "into", "towards", "against", "total",
-    "bal", "balance", "avl", "available", "lash", "lakh", "kaafi", "bahut", "aaj",
-    "kal", "kal,", "sir", "madam", "thanks", "thank", "please", "pls", "bhej",
-    "bheja", "jama", "diya", "kar", "gaya", "hua", "aaya",
+    "yesterday", "now", "message", "alert", "ok", "okay", "rtgs", "nach",
+    "rupee", "credit", "debit", "into", "towards", "against", "total", "bal",
+    "balance", "avl", "available", "lakh", "kaafi", "bahut", "aaj", "kal", "sir",
+    "madam", "thanks", "thank", "please", "pls", "bhej", "bheja", "jama", "diya",
+    "kar", "gaya", "hua", "aaya", "google", "pay", "id", "no", "number", "oye",
+    "net", "netbanking", "transfer", "transferred", "via", "using", "got",
+    "received.", "bol", "raha", "rahi", "hu", "hoon", "main", "me",
+}
+MONTH_NAMES = {
+    "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov",
+    "dec", "january", "february", "march", "april", "june", "july", "august",
+    "september", "october", "november", "december",
+}
+# Words that share capitalisation with names but are never a person.
+NAME_NOISE = {
+    "today", "todya", "tody", "tomorrow", "day", "week", "month", "year",
+    "gpay", "phonepe", "phonepee", "paytm", "google", "pay", "app", "send",
+    "sending", "sent", "rent", "ok", "yes", "no", "done", "check", "please",
 }
 NAME_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z]{1,}")
 
@@ -251,32 +269,47 @@ def _clean_name(token: str) -> str:
     return token.strip(".,;:!?()[]{}\"'")
 
 
+def _acceptable(candidate: str) -> bool:
+    """Reject stopwords, month names, noise and abbreviations as a name."""
+    low = candidate.lower()
+    if low in NAME_STOPWORDS or low in MONTH_NAMES or low in NAME_NOISE:
+        return False
+    if len(candidate) < 3:
+        return False
+    return candidate[:1].isupper() or DEVANAGARI_RE.search(candidate) is not None
+
+
 def guess_payer_name(text: str) -> tuple[str | None, float]:
     """Best-effort first-name guess, with a 0-1 confidence.
 
-    Labelled senders ("from Priya", "Priya ne bheja", "- Rahul") are trusted
-    more than a bare capitalised word, so the confidence reflects how the name
-    was found.
+    Labelled senders ("from Priya", "to Priya", "Priya ne bheja", "- Rahul")
+    are trusted more than a bare capitalised word, so the confidence reflects
+    how the name was found.
     """
     labelled = re.search(
-        r"(?:from|sender|by|bheja|bheji|ne)\s*[:\-]?\s*([A-Za-z][A-Za-z]{2,})",
+        r"(?:from|sender|by|to|bheja|bheji|ne|ney|ने|को|से)\s*[:\-]?\s*"
+        r"([A-Z][A-Za-z]{2,}|[ऀ-ॿ]{2,})",
         text,
     )
     if labelled:
         candidate = _clean_name(labelled.group(1))
-        if candidate.lower() not in NAME_STOPWORDS:
+        if _acceptable(candidate):
             return candidate, 0.8
     # A sign-off line: "... - Rahul" or "— Rahul".
-    signoff = re.search(r"[-–—]\s*([A-Z][A-Za-z]{2,})\s*$", text.strip())
+    signoff = re.search(r"[-–—]\s*([A-Z][A-Za-z]{2,}|[ऀ-ॿ]{2,})\s*[.।]?\s*$", text.strip())
     if signoff:
         candidate = _clean_name(signoff.group(1))
-        if candidate.lower() not in NAME_STOPWORDS:
+        if _acceptable(candidate):
             return candidate, 0.75
-    for token in NAME_TOKEN_RE.findall(text):
+    # Otherwise take the last acceptable capitalised (or Devanagari) token:
+    # people usually sign off at the end of a message.
+    tokens = [t for t in NAME_TOKEN_RE.findall(text)]
+    tokens += DEVANAGARI_NAME_RE.findall(text)
+    for token in reversed(tokens):
         cleaned = _clean_name(token)
-        if cleaned.lower() in NAME_STOPWORDS:
+        if not _acceptable(cleaned):
             continue
-        if token[:1].isupper() and len(cleaned) >= 3:
+        if token[:1].isupper() or DEVANAGARI_RE.search(token):
             return cleaned, 0.45
     return None, 0.0
 
@@ -322,6 +355,7 @@ class ExtractedFields:
     method: str | None = None
     reference: str | None = None
     language: str = "en"
+    unit_hint: str | None = None
     confidence: float = 0.0
     has_payment_signal: bool = False
     injection: bool = False
@@ -336,21 +370,32 @@ class ExtractedFields:
             "method": self.method,
             "reference": self.reference,
             "language": self.language,
+            "unit_hint": self.unit_hint,
             "confidence": round(self.confidence, 3),
         }
 
 
-def _find_amount(text: str) -> int | None:
+def _find_amount(text: str, reference: str | None) -> int | None:
     """Find the most likely amount, preferring a labelled one."""
     labelled = AMOUNT_RE.search(text)
     if labelled:
         value = _to_int(labelled.group(1))
         if value:
             return value
+    reference_digits = re.sub(r"\D", "", reference) if reference else ""
     for match in BARE_AMOUNT_RE.finditer(text):
-        value = _to_int(match.group(1))
-        # Ignore things that look like years or tiny numbers.
-        if value and value >= 500 and not (1900 <= value <= 2100 and "," not in match.group(1)):
+        raw = match.group(1)
+        value = _to_int(raw)
+        if not value:
+            continue
+        # Skip the transaction reference, years, and implausibly small values.
+        if reference and value == _to_int(reference_digits):
+            continue
+        if len(reference_digits) >= 6 and reference_digits.find(str(value)) != -1:
+            continue
+        if 1900 <= value <= 2100 and "," not in raw:
+            continue
+        if value >= 500:
             return value
     return None
 
@@ -371,23 +416,19 @@ def extract_fields(text: str) -> ExtractedFields:
     payment (an amount or a payment verb). Messages with no payment at all are
     still parsed, but this flag lets the caller avoid raising false ones.
     """
-    amount = _find_amount(text)
+    amount = _find_amount(text, _find_reference(text))
     method = _find_method(text)
     paid_date = _find_date(text)
     reference = _find_reference(text)
     name, name_conf = guess_payer_name(text)
     language = guess_language(text)
     injection = injection_detected(text)
+    unit_match = UNIT_LABEL_RE.search(text)
+    unit_hint = unit_match.group(1) if unit_match else None
 
-    lowered = text.lower()
-    verb_hits = any(hint in lowered for hint in HINGLISH_HINTS) or any(
-        hint in text for hint in HINDI_PAY_HINTS
-    )
-    verb_hits = verb_hits or any(
-        word in lowered
-        for word in ("paid", "sent", "received", "credited", "transferred", "payment", "deposit")
-    )
-    has_signal = bool(amount or verb_hits)
+    # An amount is what makes a message a payment record. A verb alone ("mark
+    # all rent as paid") is not enough and must not suppress the no-payment flag.
+    has_signal = bool(amount)
 
     confidence_items = [name_conf]
     if amount:
@@ -407,6 +448,7 @@ def extract_fields(text: str) -> ExtractedFields:
         method=method,
         reference=reference,
         language=language,
+        unit_hint=unit_hint,
         confidence=confidence,
         has_payment_signal=has_signal,
         injection=injection,

@@ -34,7 +34,8 @@ class Settings(BaseSettings):
     llm_model: str = "claude-3-5-haiku-latest"
 
     # Payment parsing
-    payment_match_cutoff: float = 55.0  # minimum name score (0-100) to list a candidate
+    payment_match_cutoff: float = 55.0  # minimum score (0-100) to list a candidate
+    payment_name_floor: float = 60.0  # name score that counts as "the same person"
 
     # Admin
     enable_admin_reseed: bool = False

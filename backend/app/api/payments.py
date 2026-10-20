@@ -7,12 +7,11 @@ event first.
 
 from __future__ import annotations
 
-import json
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app import clock
+from app.audit import append_event
 from app.db import get_session
 from app.ml.scoring import current_cycle, score_open_cycle
 from app.models import AuditEvent, Lease, Payment
@@ -32,24 +31,6 @@ VALID_METHODS = {"upi", "cash", "bank_transfer", "cheque"}
 AMOUNT_TOLERANCE = 0
 
 
-def _record_audit(
-    session: Session,
-    event_type: str,
-    lease_id: int | None,
-    cycle_month,
-    detail: dict,
-) -> None:
-    """Append one audit row; never mutate an existing one."""
-    session.add(
-        AuditEvent(
-            event_type=event_type,
-            lease_id=lease_id,
-            cycle_month=cycle_month,
-            detail_json=json.dumps(detail, ensure_ascii=False),
-        )
-    )
-
-
 @router.post("/parse", response_model=PaymentParseResponse)
 def parse_message(
     body: PaymentParseRequest, session: Session = Depends(get_session)
@@ -62,8 +43,20 @@ def parse_message(
             detail={"code": "empty_message", "message": "Paste a payment message first."},
         )
     result = parse_payment_message(session, text)
+    candidate_ids = [match.lease_id for match in result.matches]
+    fields = result.fields.as_dict()
+    safe_fields = {key: fields.get(key) for key in ("amount", "paid_date", "method", "language")}
+    safe_fields["reference_present"] = bool(fields.get("reference"))
+    append_event(
+        session,
+        "payment_parsed",
+        f"Parsed payment message with {len(candidate_ids)} candidate lease{'s' if len(candidate_ids) != 1 else ''}",
+        candidate_ids[0] if len(candidate_ids) == 1 else None,
+        {"fields": safe_fields, "candidate_lease_ids": candidate_ids, "flags": result.flags},
+    )
+    session.commit()
     return PaymentParseResponse(
-        fields=ParsedFields(**result.fields.as_dict()),
+        fields=ParsedFields(**fields),
         matches=[PaymentMatch(**m.as_dict()) for m in result.matches],
         flags=result.flags,
     )
@@ -81,7 +74,10 @@ def record_payment(
     if body.method not in VALID_METHODS:
         raise HTTPException(
             status_code=422,
-            detail={"code": "invalid_method", "message": "Method must be upi, cash, bank_transfer or cheque."},
+            detail={
+                "code": "invalid_method",
+                "message": "Method must be upi, cash, bank_transfer or cheque.",
+            },
         )
     if body.amount <= 0:
         raise HTTPException(
@@ -96,7 +92,9 @@ def record_payment(
 
     lease = session.get(Lease, body.lease_id)
     if lease is None:
-        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Lease not found."})
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": "Lease not found."}
+        )
 
     cycle = current_cycle(session)
     payment = session.exec(
@@ -109,14 +107,14 @@ def record_payment(
     # Duplicates: the same cycle already paid on this date for this amount, or
     # another recorded payment already carries this reference.
     if payment is not None and payment.paid_date is not None:
-        if payment.paid_date == body.paid_date and payment.amount == body.amount:
-            _reject(session, body, "duplicate", {"reason": "duplicate", "amount": body.amount})
-            raise HTTPException(
-                status_code=409,
-                detail={"code": "duplicate", "message": "This payment is already recorded for that month."},
-            )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "duplicate",
+                "message": "This payment is already recorded for that month.",
+            },
+        )
     if reference and _reference_exists(session, reference):
-        _reject(session, body, "duplicate_reference", {"reason": "duplicate_reference", "reference": reference})
         raise HTTPException(
             status_code=409,
             detail={"code": "duplicate", "message": "That reference is already recorded."},
@@ -143,12 +141,13 @@ def record_payment(
     payment.method = body.method
 
     days_late = max(0, (body.paid_date - payment.due_date).days)
-    _record_audit(
+    append_event(
         session,
         "payment_recorded",
+        f"Recorded payment for lease {body.lease_id}",
         body.lease_id,
-        body.cycle_month,
         {
+            "cycle_month": body.cycle_month.isoformat(),
             "amount": body.amount,
             "paid_date": body.paid_date.isoformat(),
             "method": body.method,
@@ -174,18 +173,10 @@ def record_payment(
     )
 
 
-def _reject(session: Session, body: PaymentRecordRequest, reason: str, detail: dict) -> None:
-    """Log a rejected attempt and commit so the rejection is recorded."""
-    _record_audit(session, "payment_rejected", body.lease_id, body.cycle_month, detail)
-    session.commit()
-
-
 def _reference_exists(session: Session, reference: str) -> bool:
     """Whether a recorded payment already carries this reference."""
-    events = session.exec(
-        select(AuditEvent).where(AuditEvent.event_type == "payment_recorded")
-    ).all()
+    events = session.exec(select(AuditEvent).where(AuditEvent.kind == "payment_recorded")).all()
     for event in events:
-        if json.loads(event.detail_json or "{}").get("reference") == reference:
+        if event.details.get("reference") == reference:
             return True
     return False

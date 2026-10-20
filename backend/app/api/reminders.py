@@ -9,11 +9,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app import clock
+from app.audit import append_event
 from app.db import get_session
 from app.llm.drafter import draft_message
 from app.llm.guardrails import check_all
 from app.models import Lease, Payment, Reminder, Tenant, Unit
-from app.schemas import CheckRequest, DraftRequest, GuardrailResult, PlanStep, ReminderOut
+from app.schemas import (
+    CheckRequest,
+    DraftRequest,
+    GuardrailResult,
+    PlanStep,
+    ReminderEditRequest,
+    ReminderOut,
+)
 
 router = APIRouter()
 
@@ -26,7 +34,9 @@ def system_channel(preferred_channel: str) -> str:
     return "whatsapp" if preferred_channel == "call" else preferred_channel
 
 
-def build_plan(tier: str, preferred_channel: str, due_date: date, has_overdue: bool) -> list[PlanStep]:
+def build_plan(
+    tier: str, preferred_channel: str, due_date: date, has_overdue: bool
+) -> list[PlanStep]:
     """Deterministic reminder plan for a risk tier.
 
     low: one friendly reminder the day before due.
@@ -40,15 +50,57 @@ def build_plan(tier: str, preferred_channel: str, due_date: date, has_overdue: b
     channel = system_channel(preferred_channel)
     steps: list[PlanStep] = []
     if tier == "low":
-        steps.append(PlanStep(offset_days=-1, date=due_date - timedelta(days=1), channel=channel, tone="friendly", owner="system"))
+        steps.append(
+            PlanStep(
+                offset_days=-1,
+                date=due_date - timedelta(days=1),
+                channel=channel,
+                tone="friendly",
+                owner="system",
+            )
+        )
     elif tier == "medium":
-        steps.append(PlanStep(offset_days=-3, date=due_date - timedelta(days=3), channel=channel, tone="neutral", owner="system"))
-        steps.append(PlanStep(offset_days=0, date=due_date, channel=channel, tone="neutral", owner="system"))
+        steps.append(
+            PlanStep(
+                offset_days=-3,
+                date=due_date - timedelta(days=3),
+                channel=channel,
+                tone="neutral",
+                owner="system",
+            )
+        )
+        steps.append(
+            PlanStep(offset_days=0, date=due_date, channel=channel, tone="neutral", owner="system")
+        )
     else:  # high
-        steps.append(PlanStep(offset_days=-5, date=due_date - timedelta(days=5), channel=channel, tone="friendly", owner="system"))
-        steps.append(PlanStep(offset_days=-2, date=due_date - timedelta(days=2), channel="call", tone="friendly", owner="manager"))
+        steps.append(
+            PlanStep(
+                offset_days=-5,
+                date=due_date - timedelta(days=5),
+                channel=channel,
+                tone="friendly",
+                owner="system",
+            )
+        )
+        steps.append(
+            PlanStep(
+                offset_days=-2,
+                date=due_date - timedelta(days=2),
+                channel="call",
+                tone="friendly",
+                owner="manager",
+            )
+        )
     if preferred_channel == "call" and tier != "high":
-        steps.append(PlanStep(offset_days=-2, date=due_date - timedelta(days=2), channel="call", tone="friendly", owner="manager"))
+        steps.append(
+            PlanStep(
+                offset_days=-2,
+                date=due_date - timedelta(days=2),
+                channel="call",
+                tone="friendly",
+                owner="manager",
+            )
+        )
     _ = has_overdue
     return steps
 
@@ -106,7 +158,9 @@ def _to_out(reminder: Reminder, session: Session) -> ReminderOut:
 
 
 @router.get("", response_model=list[ReminderOut])
-def list_reminders(lease_id: int | None = None, session: Session = Depends(get_session)) -> list[ReminderOut]:
+def list_reminders(
+    lease_id: int | None = None, session: Session = Depends(get_session)
+) -> list[ReminderOut]:
     """List reminders, optionally filtered by lease."""
     stmt = select(Reminder).order_by(Reminder.created_at.desc())  # type: ignore[attr-defined]
     if lease_id is not None:
@@ -118,13 +172,24 @@ def list_reminders(lease_id: int | None = None, session: Session = Depends(get_s
 def draft_reminder(body: DraftRequest, session: Session = Depends(get_session)) -> ReminderOut:
     """Draft a reminder message for a lease, language and tone."""
     if body.language not in VALID_LANGUAGES:
-        raise HTTPException(status_code=422, detail={"code": "invalid_language", "message": "Language must be en, hi or hinglish."})
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_language", "message": "Language must be en, hi or hinglish."},
+        )
     if body.tone not in VALID_TONES:
-        raise HTTPException(status_code=422, detail={"code": "invalid_tone", "message": "Tone must be friendly, neutral or polite_firm."})
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_tone",
+                "message": "Tone must be friendly, neutral or polite_firm.",
+            },
+        )
 
     lease = session.get(Lease, body.lease_id)
     if lease is None:
-        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Lease not found."})
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": "Lease not found."}
+        )
     tenant = session.get(Tenant, lease.tenant_id)
     unit = session.get(Unit, lease.unit_id)
     cycle_month, due, amount = _open_cycle_and_due(session, body.lease_id)
@@ -134,7 +199,9 @@ def draft_reminder(body: DraftRequest, session: Session = Depends(get_session)) 
     notes = []
     if tone == "polite_firm" and not has_overdue:
         tone = "neutral"
-        notes.append("Polite firm tone is only used when a payment is already overdue, so this draft is neutral.")
+        notes.append(
+            "Polite firm tone is only used when a payment is already overdue, so this draft is neutral."
+        )
 
     due_str = f"{due.day} {due.strftime('%b')}"
     result = draft_message(
@@ -167,20 +234,40 @@ def draft_reminder(body: DraftRequest, session: Session = Depends(get_session)) 
         ),
     )
     session.add(reminder)
+    session.flush()
+    append_event(
+        session,
+        "reminder_drafted",
+        f"Drafted reminder for lease {body.lease_id}",
+        body.lease_id,
+        {
+            "reminder_id": reminder.id,
+            "cycle_month": cycle_month.isoformat(),
+            "channel": reminder.channel,
+            "tone": reminder.tone,
+            "language": reminder.language,
+        },
+    )
     session.commit()
     session.refresh(reminder)
     out = _to_out(reminder, session)
     if notes:
-        out.guardrails = out.guardrails + [{"name": "tone_adjusted", "passed": True, "reason": notes[0]}]
+        out.guardrails = out.guardrails + [
+            {"name": "tone_adjusted", "passed": True, "reason": notes[0]}
+        ]
     return out
 
 
 @router.post("/check", response_model=list[GuardrailResult])
-def check_message(body: CheckRequest, session: Session = Depends(get_session)) -> list[GuardrailResult]:
+def check_message(
+    body: CheckRequest, session: Session = Depends(get_session)
+) -> list[GuardrailResult]:
     """Re-run guardrails on an edited message so the drawer can gate approval."""
     lease = session.get(Lease, body.lease_id)
     if lease is None:
-        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Lease not found."})
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": "Lease not found."}
+        )
     unit = session.get(Unit, lease.unit_id)
     _, due, amount = _open_cycle_and_due(session, body.lease_id)
     due_str = f"{due.day} {due.strftime('%b')}"
@@ -199,10 +286,76 @@ def approve_reminder(reminder_id: int, session: Session = Depends(get_session)) 
     """Approve a drafted reminder."""
     reminder = session.get(Reminder, reminder_id)
     if reminder is None:
-        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Reminder not found."})
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": "Reminder not found."}
+        )
+    if reminder.status == "approved":
+        return _to_out(reminder, session)
     reminder.status = "approved"
     reminder.approved_at = clock.now()
     session.add(reminder)
+    append_event(
+        session,
+        "reminder_approved",
+        f"Approved reminder for lease {reminder.lease_id}",
+        reminder.lease_id,
+        {"reminder_id": reminder.id, "cycle_month": reminder.cycle_month.isoformat()},
+    )
     session.commit()
     session.refresh(reminder)
+    return _to_out(reminder, session)
+
+
+@router.put("/{reminder_id}/edit", response_model=ReminderOut)
+def edit_reminder(
+    reminder_id: int, body: ReminderEditRequest, session: Session = Depends(get_session)
+) -> ReminderOut:
+    """Save a checked reminder edit and append before-and-after text."""
+    reminder = session.get(Reminder, reminder_id)
+    if reminder is None:
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": "Reminder not found."}
+        )
+    if reminder.status == "approved":
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "already_approved", "message": "Approved reminders cannot be edited."},
+        )
+    if not body.message.strip():
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "empty_message", "message": "Enter reminder text before saving."},
+        )
+    lease = session.get(Lease, reminder.lease_id)
+    unit = session.get(Unit, lease.unit_id) if lease else None
+    _, due, amount = _open_cycle_and_due(session, reminder.lease_id)
+    checks = check_all(
+        message=body.message,
+        language=reminder.language,
+        amount_str=f"{amount:,}",
+        due_str=f"{due.day} {due.strftime('%b')}",
+        allowed_numeric_tokens=[unit.label] if unit else [],
+    )
+    failed = [check.reason for check in checks if not check.passed]
+    if failed:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "guardrail_failed",
+                "message": "Fix the reminder checks before saving: " + " ".join(failed),
+            },
+        )
+    if body.message != reminder.message:
+        before = reminder.message
+        reminder.message = body.message
+        session.add(reminder)
+        append_event(
+            session,
+            "reminder_edited",
+            f"Edited reminder for lease {reminder.lease_id}",
+            reminder.lease_id,
+            {"reminder_id": reminder.id, "before": before, "after": body.message},
+        )
+        session.commit()
+        session.refresh(reminder)
     return _to_out(reminder, session)

@@ -60,16 +60,27 @@ def _best_name_score(name_guess: str, tenant_name: str) -> float:
     return float(max(fuzz.WRatio(guess, candidate) for candidate in candidates))
 
 
+def matches_name(name_guess: str, tenant_name: str) -> bool:
+    """Whether a name guess is close enough to treat as the same person."""
+    return _best_name_score(name_guess, tenant_name) >= settings.payment_name_floor
+
+
 def match_leases(
     session: Session,
     payer_name_guess: str | None,
     amount: int | None,
     limit: int = 3,
+    unit_hint: str | None = None,
 ) -> list[LeaseMatch]:
     """Rank active leases for a parsed message and return the top ``limit``.
 
     Only leases that have a bill for the open cycle are candidates, so the
     short list can never point at a former tenant.
+
+    Scoring is built from independent signals so a wrong name guess cannot
+    outrank a strong amount signal, and a message with no name at all can still
+    surface the lease whose rent matches. An explicit unit label ("MAN-02") is
+    the strongest signal when present.
     """
     open_cycle = clock.open_cycle()
     units = {u.id: u for u in session.exec(select(Unit)).all()}
@@ -88,21 +99,36 @@ def match_leases(
         name_score = _best_name_score(payer_name_guess or "", tenant.name)
         score = name_score
         reasons: list[str] = []
+
+        if unit_hint and unit.label.upper() == unit_hint.upper():
+            score += 50
+            reasons.append(f"Unit {unit.label} is named in the message")
+        elif unit_hint:
+            score -= 25
+            reasons.append("Unit label does not match this lease")
+
         if payer_name_guess:
             if name_score >= 85:
+                score += 15
                 reasons.append("Name matches closely")
-            elif name_score >= 60:
+            elif name_score >= settings.payment_name_floor:
+                score += 5
                 reasons.append("Name is a partial match")
             else:
-                reasons.append("Name does not match closely")
+                score -= 40
+                reasons.append("Name does not match this tenant")
 
         open_payment = payments[-1]
-        if amount is not None and amount == open_payment.amount:
-            score += 25
+        amount_match = amount is not None and (
+            amount == open_payment.amount
+            or (lease.monthly_rent is not None and amount == lease.monthly_rent)
+        )
+        no_name_signal = not payer_name_guess and not unit_hint
+        if amount_match:
+            # A bank SMS often carries only an amount: on its own it should be
+            # enough to list the lease whose rent matches the open cycle.
+            score += 55 if no_name_signal else 25
             reasons.append("Amount equals the rent due")
-        elif amount is not None and amount == lease.monthly_rent:
-            score += 20
-            reasons.append("Amount equals the rent")
 
         score += 10
         reasons.append(f"{open_cycle.strftime('%B')} is the open cycle")
@@ -113,10 +139,10 @@ def match_leases(
                 tenant=tenant.name,
                 unit=unit.label,
                 cycle_month=open_cycle,
-                score=min(score, 100.0),
+                score=min(max(score, 0.0), 100.0),
                 reasons=reasons,
             )
         )
 
-    results.sort(key=lambda m: (-m.score, m.tenant))
+    results.sort(key=lambda m: (-m.score, m.lease_id))
     return [m for m in results if m.score >= settings.payment_match_cutoff][:limit]

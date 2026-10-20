@@ -12,7 +12,7 @@ from sqlmodel import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import clock
-from app.api import ledger, maintenance, model, payments, portfolio, reminders, tenants
+from app.api import audit, ledger, maintenance, model, payments, portfolio, reminders, tenants
 from app.config import settings
 from app.db import engine, init_db
 
@@ -67,7 +67,12 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
     logger.exception("Unhandled error on %s", request.url.path)
     return JSONResponse(
         status_code=500,
-        content={"error": {"code": "internal_error", "message": "Something went wrong. Check the server logs."}},
+        content={
+            "error": {
+                "code": "internal_error",
+                "message": "Something went wrong. Check the server logs.",
+            }
+        },
     )
 
 
@@ -124,4 +129,5 @@ app.include_router(tenants.router, prefix="/api/tenants", tags=["tenants"])
 app.include_router(reminders.router, prefix="/api/reminders", tags=["reminders"])
 app.include_router(maintenance.router, prefix="/api/maintenance", tags=["maintenance"])
 app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
+app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(model.router, prefix="/api/model", tags=["model"])

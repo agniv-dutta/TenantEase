@@ -442,6 +442,11 @@ table.data thead th {
 .portfolio-row span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 .portfolio-table-wrap { max-width: 100%; overflow-x: auto; }
 .portfolio-table-wrap table { min-width: 510px; }
+.audit-table-wrap { max-width: 100%; overflow-x: auto; }
+.audit-table { min-width: 820px; }
+.audit-filters input { max-width: 210px; }
+.audit-drawer { display: flex; flex-direction: column; gap: var(--s-3); }
+.audit-value { max-width: 100%; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--s-3); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); font: var(--fs-small)/var(--lh-small) var(--font-body); }
 
 @media (max-width: 420px) {
   .portfolio-row { grid-template-columns: minmax(80px, 1fr) 48px minmax(112px, 1fr); font-size: var(--fs-small); }

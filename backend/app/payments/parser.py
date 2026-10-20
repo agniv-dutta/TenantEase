@@ -150,7 +150,9 @@ def parse_payment_message(session: Session, text: str) -> ParseResult:
     """Parse one message into fields, candidate leases and flags."""
     fields = extract_fields(text)
     fields, used_llm = _apply_llm(fields, text)
-    matches = match_leases(session, fields.payer_name_guess, fields.amount)
+    matches = match_leases(
+        session, fields.payer_name_guess, fields.amount, unit_hint=fields.unit_hint
+    )
 
     rent_amounts: dict[int, int] = {}
     for match in matches:

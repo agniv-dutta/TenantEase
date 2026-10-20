@@ -2,6 +2,7 @@
 
 import type {
   Guardrail,
+  AuditEvent,
   LedgerResponse,
   MaintenanceRequest,
   ModelCardResponse,
@@ -71,6 +72,9 @@ export const api = {
     }),
   approveReminder: (id: number) =>
     request<Reminder>(`/api/reminders/${id}/approve`, { method: "POST" }),
+  editReminder: (id: number, message: string) =>
+    request<Reminder>(`/api/reminders/${id}/edit`, { method: "PUT", body: JSON.stringify({ message }) }),
+  auditEvents: () => request<AuditEvent[]>("/api/audit"),
   checkMessage: (leaseId: number, language: string, message: string) =>
     request<Guardrail[]>("/api/reminders/check", {
       method: "POST",

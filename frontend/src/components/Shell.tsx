@@ -8,6 +8,7 @@ const LINKS = [
   { to: "/", label: "Overview" },
   { to: "/app/ledger", label: "Ledger" },
   { to: "/app/portfolio", label: "Portfolio" },
+  { to: "/app/audit", label: "Audit" },
   { to: "/app/outlook", label: "Outlook" },
   { to: "/app/outbox", label: "Outbox" },
   { to: "/app/model-notes", label: "Model notes" },

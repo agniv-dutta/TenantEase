@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
 from app.clock import now
@@ -136,17 +137,13 @@ class Meta(SQLModel, table=True):
 
 
 class AuditEvent(SQLModel, table=True):
-    """An append-only log of actions that change payment records.
-
-    Recording a pasted payment is never allowed to happen silently, so every
-    accepted or rejected attempt leaves a row here with what was decided and
-    why.
-    """
+    """An append-only server record of demo actions."""
 
     __tablename__ = "audit_events"
     id: int | None = Field(default=None, primary_key=True)
-    event_type: str = Field(index=True)  # payment_recorded | payment_rejected
+    at: datetime = Field(index=True)
+    actor: str = "demo manager"
+    kind: str = Field(index=True)
     lease_id: int | None = Field(default=None, index=True)
-    cycle_month: date | None = None
-    detail_json: str = "{}"
-    created_at: datetime = Field(default_factory=_demo_now)
+    summary: str
+    details: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))

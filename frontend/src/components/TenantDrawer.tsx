@@ -134,6 +134,10 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
     if (!reminder) return;
     setBusy(true);
     try {
+      if (edited && message !== reminder.message) {
+        const saved = await api.editReminder(reminder.id, message);
+        setReminder(saved);
+      }
       const updated = await api.approveReminder(reminder.id);
       setReminder(updated);
       setToast("Reminder approved");
@@ -252,7 +256,16 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
 
       {reminder && (
         <>
-          <textarea value={message} onChange={(e) => handleEdit(e.target.value)} aria-label="Reminder message" />
+          <textarea value={message} onChange={(e) => handleEdit(e.target.value)} aria-label="Reminder message" onBlur={async () => {
+            if (!reminder || approved || !edited || message === reminder.message) return;
+            try {
+              const saved = await api.editReminder(reminder.id, message);
+              setReminder(saved);
+              setEdited(false);
+            } catch (e) {
+              setToast(e instanceof ApiError ? e.message : "Could not save the reminder edit. Fix the checks and try again.");
+            }
+          }} />
           <ul className="guardrail-list">
             {guardrails.map((g) => (
               <li key={g.name}>{g.passed ? g.reason : `Needs fixing: ${g.reason}`}</li>

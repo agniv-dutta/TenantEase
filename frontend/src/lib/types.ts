@@ -152,3 +152,15 @@ export interface ModelCardResponse {
   slices: Record<string, unknown>;
   card_markdown: string;
 }
+
+export type AuditKind = "reminder_drafted" | "reminder_edited" | "reminder_approved" | "payment_recorded" | "payment_parsed";
+
+export interface AuditEvent {
+  id: number;
+  at: string;
+  actor: string;
+  kind: AuditKind;
+  lease_id: number | null;
+  summary: string;
+  details: Record<string, unknown>;
+}

@@ -8,6 +8,7 @@ import OutlookPage from "./pages/OutlookPage";
 import OutboxPage from "./pages/OutboxPage";
 import LandingPage from "./pages/LandingPage";
 import PortfolioPage from "./pages/PortfolioPage";
+import AuditPage from "./pages/AuditPage";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
       <Route path="/app" element={<Navigate to="/app/ledger" replace />} />
       <Route path="/app/ledger" element={<Shell><LedgerPage /></Shell>} />
       <Route path="/app/portfolio" element={<Shell><PortfolioPage /></Shell>} />
+      <Route path="/app/audit" element={<Shell><AuditPage /></Shell>} />
       <Route path="/app/outlook" element={<Shell><OutlookPage /></Shell>} />
       <Route path="/app/outbox" element={<Shell><OutboxPage /></Shell>} />
       <Route path="/app/model-notes" element={<Shell><ModelNotesPage /></Shell>} />
