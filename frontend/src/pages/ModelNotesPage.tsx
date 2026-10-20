@@ -84,7 +84,7 @@ function CalibrationPlot({ model }: { model: ModelMetrics }) {
     .join(" ");
 
   return (
-    <svg className="chart-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-labelledby="calibration-title" aria-describedby="calibration-description">
+    <svg className="chart-svg calibration-plot" viewBox={`0 0 ${W} ${H}`} role="img" aria-labelledby="calibration-title" aria-describedby="calibration-description">
       <title id="calibration-title">Calibration curve</title>
       <desc id="calibration-description">The dashed diagonal marks perfect calibration. The plotted points compare predicted probability with the share of leases that were actually late.</desc>
       <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} stroke="var(--indigo-soft)" strokeDasharray="4 4" />

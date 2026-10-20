@@ -16,13 +16,15 @@ function Cell({ cell, seed, animate, delayMs = 0 }: { cell: PaymentCell; seed: s
   const detail = cell.days_late ? `+${cell.days_late} days` : undefined;
   switch (cell.status) {
     case "paid_late":
-      return <Stamp kind="late" detail={detail} seed={seed} />;
+      return <Stamp kind="late" detail={detail} seed={seed} animateIn={animate} delayMs={delayMs} />;
     case "unpaid_overdue":
       return <Stamp kind="overdue" seed={seed} animateIn={animate} delayMs={delayMs} />;
     case "open":
       return <Stamp kind="due" seed={seed} animateIn={animate} delayMs={delayMs} />;
     case "paid_on_time":
       return <span className="num cell-paid">{cell.paid_date ? formatDate(cell.paid_date) : "—"}</span>;
+    case "vacant":
+      return <span className="soft">—</span>;
     default:
       return <span className="num soft">{formatDate(cell.due_date)}</span>;
   }
@@ -60,6 +62,7 @@ export default function LedgerTable({ rows, onOpen, shouldAnimate }: LedgerTable
           return (
             <tr
               key={row.lease_id}
+              data-lease-id={row.lease_id}
               tabIndex={0}
               onClick={() => onOpen(row.lease_id)}
               onKeyDown={(e) => {
@@ -75,11 +78,11 @@ export default function LedgerTable({ rows, onOpen, shouldAnimate }: LedgerTable
               </td>
               {row.cycles.map((cell, i) => (
                 <td key={cell.cycle_month} className={`cycle-cell${i < months.length - 2 ? " hide-narrow" : ""}`}>
-                  <Cell cell={cell} seed={`${row.lease_id}-${cell.cycle_month}`} animate={animate} delayMs={delay} />
+                  <Cell cell={cell} seed={`${row.lease_id}-${cell.cycle_month}`} animate={animate} delayMs={delay + i * 60} />
                 </td>
               ))}
               <td className="cycle-cell">
-                <Cell cell={row.current} seed={`${row.lease_id}-open`} animate={animate} delayMs={delay} />
+                <Cell cell={row.current} seed={`${row.lease_id}-open`} animate={animate} delayMs={delay + row.cycles.length * 60} />
               </td>
               <td className="cell-risk cycle-cell">
                 {row.current.probability != null && tier ? (

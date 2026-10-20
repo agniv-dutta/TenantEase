@@ -143,6 +143,7 @@ export interface OutlookResponse {
   total_due: number;
   points: OutlookPoint[];
   likely_late_count: number;
+  as_of_date: string;
 }
 
 export interface ModelCardResponse {

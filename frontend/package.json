@@ -7,9 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test:stamps": "node scripts/stamp-test.mjs",
+    "test:stamp-sequence": "node scripts/stamp-sequence-test.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
-    "screenshots": "node scripts/screenshots.mjs http://localhost:5173 ../docs/screenshots",
+    "screenshots": "node scripts/screenshots.mjs http://127.0.0.1:5173 ../docs/screenshots",
     "a11y": "node scripts/a11y.mjs http://localhost:5173"
   },
   "dependencies": {

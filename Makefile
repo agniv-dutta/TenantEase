@@ -1,4 +1,4 @@
-.PHONY: setup seed train eval api web test demo check report-assets lint docker
+.PHONY: setup seed train eval api web test demo check report-assets lint docker landing-sample
 
 PYTHON ?= python
 PIP ?= pip
@@ -27,6 +27,9 @@ api:
 web:
 	cd $(FRONTEND_DIR) && npm run dev
 
+landing-sample:
+	cd $(FRONTEND_DIR) && node scripts/landing-sample.mjs
+
 test:
 	cd $(BACKEND_DIR) && $(PYTHON) -m pytest -q
 
@@ -40,7 +43,7 @@ check: lint test
 report-assets:
 	cd $(BACKEND_DIR) && $(PYTHON) -m app.ml.report_assets
 
-demo: seed train
+demo: seed train eval
 	@echo "Run 'make api' and 'make web' in two terminals."
 
 docker:

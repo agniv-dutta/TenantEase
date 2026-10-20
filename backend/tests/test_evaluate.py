@@ -5,7 +5,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from app.ml.evaluate import expected_calibration_error, gap_flags, model_metrics, paired_bootstrap_comparison, top_k_metrics
+from app.ml.evaluate import (
+    expected_calibration_error,
+    gap_flags,
+    model_metrics,
+    paired_bootstrap_comparison,
+    top_k_metrics,
+)
 
 
 def test_ece_perfect_predictions() -> None:

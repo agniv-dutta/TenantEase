@@ -52,6 +52,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   health: () => request<{ status: string }>("/api/health"),
   portfolioSummary: () => request<PortfolioSummary>("/api/portfolio/summary"),
+  spotlight: () => request<{ lease_id: number }>("/api/portfolio/spotlight"),
   ledger: (propertyId?: number, months = 6) =>
     request<LedgerResponse>(
       `/api/ledger?months=${months}${propertyId ? `&property_id=${propertyId}` : ""}`,

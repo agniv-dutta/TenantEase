@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app import clock
 from app.api import ledger, maintenance, model, portfolio, reminders, tenants
 from app.config import settings
 from app.db import engine, init_db
@@ -51,6 +52,15 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     )
 
 
+@app.exception_handler(FileNotFoundError)
+async def data_out_of_date_handler(request: Request, exc: FileNotFoundError) -> JSONResponse:
+    """Data that does not cover the open cycle is a reseed, never a silent gap."""
+    return JSONResponse(
+        status_code=503,
+        content={"error": {"code": "data_out_of_date", "message": str(exc)}},
+    )
+
+
 @app.exception_handler(Exception)
 async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """Return a consistent error body for unhandled exceptions."""
@@ -65,6 +75,7 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
 def on_startup() -> None:
     """Initialise the database and score the open cycle if a model exists."""
     init_db()
+    _warn_on_stale_data()
     try:
         from app.ml.scoring import score_open_cycle
 
@@ -72,10 +83,33 @@ def on_startup() -> None:
             n = score_open_cycle(session)
         if n:
             logger.info("Scored %d leases for the open cycle", n)
-    except FileNotFoundError:
-        logger.info("No trained model yet; skipping startup scoring")
+    except FileNotFoundError as exc:
+        logger.warning("Startup scoring skipped: %s", exc)
     except Exception as exc:  # pragma: no cover - startup must not crash the API
         logger.warning("Startup scoring skipped: %s", exc)
+
+
+def _warn_on_stale_data() -> None:
+    """Log loudly when the database was not seeded for the demo clock."""
+    from app.ml.scoring import current_cycle
+    from app.models import Meta
+
+    with Session(engine) as session:
+        try:
+            current_cycle(session)
+        except FileNotFoundError as exc:
+            logger.warning("%s", exc)
+            return
+        seeded = session.get(Meta, "demo_today")
+
+    if seeded is None:
+        logger.warning("The data was seeded before DEMO_TODAY was recorded; run `make seed`.")
+    elif seeded.value != clock.today().isoformat():
+        logger.warning(
+            "The data was seeded for %s but DEMO_TODAY is %s; run `make seed`.",
+            seeded.value,
+            clock.today().isoformat(),
+        )
 
 
 @app.get("/api/health")

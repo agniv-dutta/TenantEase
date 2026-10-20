@@ -5,10 +5,11 @@ import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 
 const LINKS = [
-  { to: "/", label: "Ledger" },
-  { to: "/outlook", label: "Outlook" },
-  { to: "/outbox", label: "Outbox" },
-  { to: "/model-notes", label: "Model notes" },
+  { to: "/", label: "Overview" },
+  { to: "/app/ledger", label: "Ledger" },
+  { to: "/app/outlook", label: "Outlook" },
+  { to: "/app/outbox", label: "Outbox" },
+  { to: "/app/model-notes", label: "Model notes" },
 ];
 
 export default function Shell({ children }: { children: ReactNode }) {

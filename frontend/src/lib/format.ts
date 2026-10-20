@@ -1,6 +1,7 @@
 /** Small formatting helpers. Numbers are formatted with the en-IN locale. */
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const LONG_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export function formatINR(value: number): string {
   return "₹" + value.toLocaleString("en-IN", { maximumFractionDigits: 0 });
@@ -11,9 +12,19 @@ export function formatDate(iso: string): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
+export function formatFullDate(iso: string): string {
+  const d = new Date(iso + (iso.length === 10 ? "T00:00:00" : ""));
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 export function monthShort(iso: string): string {
   const d = new Date(iso + (iso.length === 10 ? "T00:00:00" : ""));
   return MONTHS[d.getMonth()];
+}
+
+export function monthLong(iso: string): string {
+  const d = new Date(iso + (iso.length === 10 ? "T00:00:00" : ""));
+  return LONG_MONTHS[d.getMonth()];
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

@@ -46,7 +46,7 @@ class PaymentCell(BaseModel):
 
     cycle_month: date
     due_date: date
-    status: str  # paid_on_time | paid_late | unpaid_overdue | unpaid_upcoming | open
+    status: str  # paid_on_time | paid_late | unpaid_overdue | unpaid_upcoming | open | vacant
     paid_date: date | None = None
     days_late: int | None = None
     amount: int

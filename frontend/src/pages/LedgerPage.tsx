@@ -1,12 +1,13 @@
 /** Ledger page: the register of leases with stamps pressed into the months. */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import LedgerTable from "../components/LedgerTable";
 import RegisterTabs from "../components/RegisterTabs";
 import TenantDrawer from "../components/TenantDrawer";
 import { ApiError } from "../lib/api";
-import { formatDate, formatINR, monthShort } from "../lib/format";
+import { formatFullDate, formatINR, monthLong } from "../lib/format";
 import { useLedger, usePortfolioSummary } from "../lib/queries";
 
 const stampedThisSession = new Set<number>();
@@ -16,12 +17,24 @@ export default function LedgerPage() {
   const [riskFirst, setRiskFirst] = useState(true);
   const [needCallOnly, setNeedCallOnly] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialSequenceStarted = useRef(false);
 
   const summary = usePortfolioSummary();
   const ledger = useLedger(undefined, 6);
 
   const rows = ledger.data?.rows ?? [];
+
+  useEffect(() => {
+    const lease = Number(searchParams.get("lease"));
+    if (Number.isInteger(lease) && lease > 0) setSelected(lease);
+  }, [searchParams]);
+
+  const closeDrawer = () => {
+    setSelected(null);
+    if (searchParams.has("lease")) setSearchParams({}, { replace: true });
+    window.setTimeout(() => document.querySelector<HTMLElement>(`[data-lease-id="${selected}"]`)?.focus(), 0);
+  };
 
   const properties = useMemo(() => {
     const seen = new Map<number, string>();
@@ -58,7 +71,7 @@ export default function LedgerPage() {
       <h1 className="page-title">Khata</h1>
       <p className="soft">
         {summary.data
-          ? `${summary.data.active_leases} active leases, ${monthShort(summary.data.cycle_month)} cycle, expected collection ${formatINR(summary.data.expected_collection_inr)} of ${formatINR(summary.data.total_rent_due_inr)}. Data as of ${formatDate(summary.data.as_of_date)}.`
+          ? `${summary.data.active_leases} active leases, ${monthLong(summary.data.cycle_month)} cycle, expected collection ${formatINR(summary.data.expected_collection_inr)} of ${formatINR(summary.data.total_rent_due_inr)}. Data as of ${formatFullDate(summary.data.as_of_date)}.`
           : "Loading portfolio…"}
       </p>
 
@@ -96,7 +109,7 @@ export default function LedgerPage() {
       )}
       {ledger.data && <LedgerTable rows={visible} onOpen={setSelected} shouldAnimate={shouldAnimate} />}
 
-      {selected !== null && <TenantDrawer leaseId={selected} onClose={() => setSelected(null)} />}
+      {selected !== null && <TenantDrawer leaseId={selected} onClose={closeDrawer} />}
     </>
   );
 }

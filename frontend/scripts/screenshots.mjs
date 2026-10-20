@@ -29,21 +29,28 @@ try {
     for (const [name, path] of PAGES) {
       await page.goto(baseUrl + path, { waitUntil: "domcontentloaded" });
       await page.locator(".page-title").first().waitFor();
+      if (path === "/") await page.locator(".ledger tbody tr").first().waitFor({ timeout: 60000 });
+      if (path === "/outlook") await page.locator(".chart-svg").waitFor();
+      if (path === "/outbox") await page.locator("article").first().waitFor({ timeout: 10000 }).catch(() => undefined);
+      if (path === "/model-notes") await page.locator(".chart-svg").waitFor();
       await page.waitForTimeout(1200); // let the stamps settle
-      const full = name !== "ledger";
-      await page.screenshot({ path: `${outDir}/${name}-${width}.png`, fullPage: full });
+      await page.screenshot({ path: `${outDir}/${name}-${width}.png`, fullPage: false });
       console.log(`shot ${name}-${width}`);
-    }
-
-    // Tenant drawer, from the first ledger row
-    await page.goto(baseUrl + "/", { waitUntil: "domcontentloaded" });
-    await page.locator(".page-title").first().waitFor();
-    const row = page.locator(".ledger tbody tr").first();
-    if (await row.count()) {
-      await row.click();
-      await page.waitForTimeout(900);
-      await page.screenshot({ path: `${outDir}/drawer-${width}.png`, fullPage: false });
-      console.log(`shot drawer-${width}`);
+      if (name === "model-notes") {
+        await page.locator(".chart-svg").scrollIntoViewIfNeeded();
+        await page.waitForTimeout(200);
+        await page.screenshot({ path: `${outDir}/model-notes-calibration-${width}.png`, fullPage: false });
+        await page.evaluate(() => window.scrollTo(0, 0));
+      }
+      if (name === "ledger") {
+        const row = page.locator(".ledger tbody tr").first();
+        await row.click();
+        await page.locator(".drawer").waitFor();
+        await page.waitForTimeout(900);
+        await page.screenshot({ path: `${outDir}/drawer-${width}.png`, fullPage: false });
+        console.log(`shot drawer-${width}`);
+        await page.getByRole("button", { name: "Close" }).click();
+      }
     }
     await context.close();
   }

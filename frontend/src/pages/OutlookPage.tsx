@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 
 import { ApiError } from "../lib/api";
-import { formatINR } from "../lib/format";
+import { formatFullDate, formatINR } from "../lib/format";
 import { useOutlook } from "../lib/queries";
 
 const W = 760;
@@ -19,8 +19,8 @@ export default function OutlookPage() {
   const chart = useMemo(() => {
     if (!data) return null;
     const days = data.points.map((p) => p.day);
-    const xMin = Math.min(...days);
-    const xMax = Math.max(...days);
+    const xMin = Math.min(1, ...days);
+    const xMax = Math.max(30, ...days);
     const yMax = data.total_due;
     const x = (d: number) => M.left + ((d - xMin) / Math.max(1, xMax - xMin)) * (W - M.left - M.right);
     const y = (v: number) => H - M.bottom - (v / yMax) * (H - M.top - M.bottom);
@@ -32,7 +32,8 @@ export default function OutlookPage() {
       " L " +
       [...data.points].reverse().map((p) => `${x(p.day).toFixed(1)} ${y(p.p10).toFixed(1)}`).join(" L ") +
       " Z";
-    return { x, y, line, band, xMin, xMax };
+    const todayDay = Number(data.as_of_date.slice(8, 10));
+    return { x, y, line, band, xMin, xMax, todayDay };
   }, [data]);
 
   return (
@@ -57,6 +58,11 @@ export default function OutlookPage() {
             late. Rent arrives in waves around the due days (1st, 5th and 10th), so the line steps up there.
           </p>
 
+          <p className="small soft">
+            Data as of {formatFullDate(data.as_of_date)}. The vertical line marks that day; the whole curve is
+            a projection, so days before the line show what the model expected, not settled payments.
+          </p>
+
           <svg className="chart-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Cumulative collections by day">
             <defs>
               <pattern id="band-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -76,6 +82,28 @@ export default function OutlookPage() {
             <path d={chart.band} fill="url(#band-hatch)" stroke="none" />
             <path d={chart.line("expected")} fill="none" stroke="var(--indigo)" strokeWidth="2.5" />
 
+            {chart.todayDay >= chart.xMin && chart.todayDay <= chart.xMax && (
+              <g>
+                <line
+                  x1={chart.x(chart.todayDay)}
+                  y1={M.top}
+                  x2={chart.x(chart.todayDay)}
+                  y2={H - M.bottom}
+                  stroke="var(--stamp-red)"
+                  strokeWidth="1.5"
+                />
+                <text
+                  x={chart.x(chart.todayDay)}
+                  y={M.top - 8}
+                  textAnchor="middle"
+                  fill="var(--stamp-red)"
+                  style={{ fontFamily: "var(--font-body)", fontSize: 12 }}
+                >
+                  today
+                </text>
+              </g>
+            )}
+
             {[1, 5, 10, 15, 20, 25, 30].map((d) =>
               d >= chart.xMin && d <= chart.xMax ? (
                 <g key={d}>
@@ -94,7 +122,8 @@ export default function OutlookPage() {
           </svg>
 
           <p className="small soft">
-            Expected collections rise through the cycle. The shaded area shows the low to high range, and dashed guides mark due days 1, 5 and 10.
+            Expected collections rise through the cycle. The shaded area shows the low to high range, dashed
+            guides mark due days 1, 5 and 10, and the red line marks today.
           </p>
           <table className="data">
             <caption className="small soft">Daily collection ranges, the text alternative to the chart.</caption>

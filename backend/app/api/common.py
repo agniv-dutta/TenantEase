@@ -2,11 +2,34 @@
 
 from __future__ import annotations
 
+import calendar
 from datetime import date
 
 from app import clock
 from app.models import Payment
 from app.schemas import PaymentCell
+
+
+def _last_day_of_month(cycle_month: date) -> date:
+    """The last calendar day of ``cycle_month``."""
+    return date(cycle_month.year, cycle_month.month, calendar.monthrange(cycle_month.year, cycle_month.month)[1])
+
+
+def vacant_cell(cycle_month: date, due_day: int) -> PaymentCell:
+    """A month the lease was not billed for: an empty cell in the register.
+
+    Rows are padded with these so every lease shows the same month columns,
+    which keeps the ledger grid aligned in the stacked layout too.
+    """
+    due_date = min(cycle_month.replace(day=due_day), _last_day_of_month(cycle_month))
+    return PaymentCell(
+        cycle_month=cycle_month,
+        due_date=due_date,
+        status="vacant",
+        paid_date=None,
+        days_late=None,
+        amount=0,
+    )
 
 
 def payment_cell(

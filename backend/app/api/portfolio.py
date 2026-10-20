@@ -17,6 +17,23 @@ from app.schemas import OutlookPoint, OutlookResponse, PortfolioSummary, TierCou
 
 router = APIRouter()
 
+
+@router.get("/spotlight")
+def spotlight(session: Session = Depends(get_session)) -> dict[str, int]:
+    """Return the eligible lease with the highest raw late-risk score."""
+    cycle = current_cycle(session)
+    scores = session.exec(select(RiskScore).where(RiskScore.cycle_month == cycle)).all()
+    eligible: list[tuple[float, int]] = []
+    for score in scores:
+        history = session.exec(
+            select(Payment).where(Payment.lease_id == score.lease_id, Payment.cycle_month < cycle)
+        ).all()
+        if len(history) >= 3:
+            eligible.append((score.raw_score, score.lease_id))
+    if not eligible:
+        raise HTTPException(status_code=404, detail={"code": "no_spotlight", "message": "No lease has three closed cycles yet."})
+    return {"lease_id": max(eligible)[1]}
+
 MC_DRAWS = 500
 
 

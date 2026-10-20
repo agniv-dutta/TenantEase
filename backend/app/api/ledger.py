@@ -5,7 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
-from app.api.common import payment_cell
+from app import clock
+from app.api.common import payment_cell, vacant_cell
 from app.db import get_session
 from app.ml.scoring import current_cycle
 from app.models import Lease, Payment, Property, RiskScore, Tenant, Unit
@@ -20,13 +21,19 @@ def ledger(
     months: int = 6,
     session: Session = Depends(get_session),
 ) -> LedgerResponse:
-    """Return ledger rows for the open cycle, optionally filtered by property."""
+    """Return ledger rows for the open cycle, optionally filtered by property.
+
+    Every row carries the same columns: ``months`` closed cycles in order,
+    padded with empty cells when the lease was not billed that month, then the
+    open cycle. That keeps the grid aligned in the stacked layout.
+    """
     if months < 1 or months > 24:
         raise HTTPException(
             status_code=422,
             detail={"code": "invalid_months", "message": "Months must be between 1 and 24."},
         )
     cycle = current_cycle(session)
+    closed_months = list(reversed(clock.recent_cycles(months)))[1:]  # oldest .. newest
     units = {u.id: u for u in session.exec(select(Unit)).all()}
     properties = {p.id: p for p in session.exec(select(Property)).all()}
     tenants = {t.id: t for t in session.exec(select(Tenant)).all()}
@@ -45,10 +52,13 @@ def ledger(
         if not payments or payments[-1].cycle_month != cycle:
             continue  # lease not active in the open cycle
         tenant = tenants[lease.tenant_id]
-        history = payments[-(months + 1) : -1]
         current = payments[-1]
+        by_month = {p.cycle_month: p for p in payments}
         score = scores.get(lease.id)  # type: ignore[arg-type]
-        cells = [payment_cell(p, cycle) for p in history]
+        cells = [
+            payment_cell(by_month[m], cycle) if m in by_month else vacant_cell(m, lease.due_day)
+            for m in closed_months
+        ]
         row = LedgerRow(
             lease_id=lease.id,  # type: ignore[arg-type]
             tenant_name=tenant.name,

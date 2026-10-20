@@ -8,8 +8,9 @@ from datetime import date
 import pytest
 from sqlmodel import Session, create_engine, select
 
+from app import clock
 from app.ml.synth import month_add, write_db
-from app.models import Lease, Payment, Tenant
+from app.models import Lease, Meta, Payment, Tenant
 
 
 @pytest.fixture(scope="module")
@@ -63,7 +64,7 @@ def test_payment_invariants(stats_and_db: tuple[dict, str]) -> None:
             assert p.cycle_month >= lease.start_date.replace(day=1)
             if p.paid_date is not None:
                 assert p.paid_date >= p.cycle_month, "paid_date before cycle start"
-                assert p.paid_date <= date.today()
+                assert p.paid_date <= clock.today(), "paid_date after DEMO_TODAY"
 
 
 def test_tenant_fields_valid(stats_and_db: tuple[dict, str]) -> None:
@@ -83,3 +84,27 @@ def test_month_add() -> None:
     """month_add wraps across year boundaries."""
     assert month_add(date(2026, 11, 1), 3) == date(2027, 2, 1)
     assert month_add(date(2026, 1, 1), -1) == date(2025, 12, 1)
+
+
+def test_seed_records_the_demo_date(stats_and_db: tuple[dict, str]) -> None:
+    """The seed writes the demo date its calendar was laid out for."""
+    stats, path = stats_and_db
+    engine = create_engine(f"sqlite:///{path}")
+    with Session(engine) as session:
+        row = session.get(Meta, "demo_today")
+    assert row is not None, "seed did not record demo_today"
+    assert row.value == clock.today().isoformat()
+    assert stats["demo_today"] == clock.today().isoformat()
+
+
+def test_cycles_are_contiguous_and_cover_the_ledger_window(stats_and_db: tuple[dict, str]) -> None:
+    """24 closed cycles run right up to the open cycle, with no gap."""
+    _, path = stats_and_db
+    engine = create_engine(f"sqlite:///{path}")
+    with Session(engine) as session:
+        cycles = sorted({p.cycle_month for p in session.exec(select(Payment)).all()})
+    open_cycle = clock.open_cycle()
+    assert cycles[-1] == open_cycle
+    expected = [month_add(open_cycle, -offset) for offset in range(24, -1, -1)]
+    assert cycles == expected
+    assert all(cycle in cycles for cycle in clock.recent_cycles())

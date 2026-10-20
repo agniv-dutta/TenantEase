@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 from sqlmodel import Session, create_engine, select
 
+from app import clock
 from app.ml.features import build_current_frame, build_training_frame, feature_columns
 from app.ml.synth import write_db
 from app.models import Lease, Payment, Tenant, Unit
@@ -29,7 +30,9 @@ def _independent_features(
 ) -> dict[str, float]:
     """Recompute each feature from only records with timestamps <= as_of."""
     due = next(p for p in payments if p.cycle_month == cycle)
-    as_of = due.due_date - timedelta(days=7)
+    # Same rule as the pipeline: seven days before the due date, never later
+    # than the demo clock.
+    as_of = min(due.due_date - timedelta(days=7), clock.today())
     priors = [p for p in payments if p.cycle_month < cycle]
 
     obs: list[tuple[float, bool]] = []
