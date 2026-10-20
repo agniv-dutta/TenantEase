@@ -2,29 +2,33 @@
 
 > All numbers come from synthetic data with planted effects. Not a forecast of production accuracy.
 
-Test rows: 540. Test base rate (>5 days late): 0.169. Operating threshold: 0.200.
+Test rows: 528. Test base rate (>5 days late): 0.167. Operating threshold: 0.200.
 
 ## Model comparison (test set)
 
 | Model | PR-AUC | ROC-AUC | Brier | ECE |
 |---|---|---|---|---|
-| B0 rule baseline | 0.286 | 0.667 | 0.196 | 0.193 |
-| B1 logistic | 0.485 | 0.774 | 0.113 | 0.031 |
-| M LightGBM (raw) | 0.495 | 0.779 | 0.115 | 0.044 |
-| M LightGBM (isotonic) | 0.448 | 0.778 | 0.113 | 0.053 |
+| B0 rule baseline | 0.275 | 0.653 | 0.191 | 0.188 |
+| B1 logistic | 0.403 | 0.701 | 0.124 | 0.057 |
+| M LightGBM (raw) | 0.353 | 0.680 | 0.128 | 0.043 |
+| M LightGBM (isotonic) | 0.318 | 0.688 | 0.131 | 0.060 |
+| M LightGBM (sigmoid/Platt) | 0.353 | 0.680 | 0.128 | 0.040 |
+| M LightGBM (smoothed isotonic) | 0.353 | 0.680 | 0.128 | 0.038 |
+| M shipped (isotonic) | 0.318 | 0.688 | 0.131 | 0.060 |
 
-Isotonic calibration maps many distinct raw scores onto a few probability levels. That improves probability quality (Brier, ECE) but creates ties that reduce ranking metrics such as PR-AUC. The uncalibrated M is reported alongside the calibrated M for honesty.
+Ranking in product uses raw model scores; displayed probabilities are calibrated.
+Shipped calibration: isotonic. Selected on validation set by lowest Brier score, with ECE as tie-breaker; PR-AUC is reported for ranking transparency.
 
 ## Ablation (occupation removed)
 
-PR-AUC 0.415, ROC-AUC 0.748.
+PR-AUC 0.319, ROC-AUC 0.685.
 
 ## Follow-up capacity (top share of leases per cycle)
 
 | Share | 5% | 10% | 15% | 20% |
 |---|---|---|---|---|
-| Precision | 0.679 | 0.625 | 0.512 | 0.454 |
-| Recall | 0.211 | 0.384 | 0.452 | 0.543 |
+| Precision | 0.464 | 0.442 | 0.388 | 0.346 |
+| Recall | 0.146 | 0.266 | 0.354 | 0.406 |
 
 ## Slices
 
@@ -32,52 +36,52 @@ PR-AUC 0.415, ROC-AUC 0.748.
 
 | Bucket | n | Late rate | Recall | False positive rate |
 |---|---|---|---|---|
-| business | 144 | 0.153 | 0.773 | 0.221 |
-| gig | 100 | 0.310 | 0.806 | 0.478 |
-| salaried | 252 | 0.079 | 0.000 | 0.004 |
-| student | 44 | 0.409 | 0.833 | 0.769 |
+| business | 120 | 0.158 | 0.895 | 0.713 |
+| gig | 76 | 0.355 | 0.889 | 0.816 |
+| salaried | 272 | 0.110 | 0.133 | 0.050 |
+| student | 60 | 0.200 | 0.833 | 0.688 |
 
 ### tenure group
 
 | Bucket | n | Late rate | Recall | False positive rate |
 |---|---|---|---|---|
-| cold_start | 3 | 0.333 | 1.000 | 0.000 |
-| established | 537 | 0.168 | 0.622 | 0.181 |
+| cold_start | 8 | 0.125 | 1.000 | 0.571 |
+| established | 520 | 0.167 | 0.621 | 0.353 |
 
 ### rent band
 
 | Bucket | n | Late rate | Recall | False positive rate |
 |---|---|---|---|---|
-| 10k_to_20k | 300 | 0.213 | 0.656 | 0.225 |
-| 20k_plus | 140 | 0.150 | 0.476 | 0.101 |
-| under_10k | 100 | 0.060 | 0.833 | 0.170 |
+| 10k_to_20k | 308 | 0.172 | 0.566 | 0.361 |
+| 20k_plus | 140 | 0.171 | 0.750 | 0.353 |
+| under_10k | 80 | 0.138 | 0.636 | 0.348 |
 
 ### preferred language audit only
 
 | Bucket | n | Late rate | Recall | False positive rate |
 |---|---|---|---|---|
-| en | 208 | 0.183 | 0.632 | 0.171 |
-| hi | 112 | 0.152 | 0.706 | 0.210 |
-| hinglish | 220 | 0.164 | 0.583 | 0.174 |
+| en | 204 | 0.176 | 0.528 | 0.292 |
+| hi | 112 | 0.170 | 0.474 | 0.280 |
+| hinglish | 212 | 0.156 | 0.818 | 0.458 |
 
 Gap flags (differences above the threshold are called out):
 
-- occupation_type recall: business vs salaried gap 77.3 points
-- occupation_type recall: gig vs salaried gap 80.7 points
-- occupation_type recall: salaried vs student gap 83.3 points
-- occupation_type fpr: business vs gig gap 25.7 points
-- occupation_type fpr: business vs salaried gap 21.7 points
-- occupation_type fpr: business vs student gap 54.8 points
-- occupation_type fpr: gig vs salaried gap 47.4 points
-- occupation_type fpr: gig vs student gap 29.1 points
-- occupation_type fpr: salaried vs student gap 76.5 points
-- tenure_group recall: cold_start vs established gap 37.8 points
-- tenure_group fpr: cold_start vs established gap 18.1 points
-- rent_band recall: 10k_to_20k vs 20k_plus gap 18.0 points
-- rent_band recall: 10k_to_20k vs under_10k gap 17.7 points
-- rent_band recall: 20k_plus vs under_10k gap 35.7 points
-- rent_band fpr: 10k_to_20k vs 20k_plus gap 12.4 points
-- preferred_language_audit_only recall: hi vs hinglish gap 12.3 points
+- occupation_type recall: business vs salaried gap 76.1 points
+- occupation_type recall: gig vs salaried gap 75.6 points
+- occupation_type recall: salaried vs student gap 70.0 points
+- occupation_type fpr: business vs gig gap 10.3 points
+- occupation_type fpr: business vs salaried gap 66.3 points
+- occupation_type fpr: gig vs salaried gap 76.7 points
+- occupation_type fpr: gig vs student gap 12.9 points
+- occupation_type fpr: salaried vs student gap 63.8 points
+- tenure_group recall: cold_start vs established gap 37.9 points
+- tenure_group fpr: cold_start vs established gap 21.8 points
+- rent_band recall: 10k_to_20k vs 20k_plus gap 18.4 points
+- rent_band recall: 20k_plus vs under_10k gap 11.4 points
+- preferred_language_audit_only recall: en vs hinglish gap 29.0 points
+- preferred_language_audit_only recall: hi vs hinglish gap 34.5 points
+- preferred_language_audit_only fpr: en vs hinglish gap 16.6 points
+- preferred_language_audit_only fpr: hi vs hinglish gap 17.8 points
 
 ## Simulation
 
@@ -111,11 +115,31 @@ Label: assumption-based, not measured. These are assumption-based projections wi
 
 Emergency recall 1.000 over 12 emergencies; emergency precision 1.000. Gas smell, sparks, fire, flooding and structural cracks are always forced to emergency, so recall does not depend on the model.
 
+## Payment capture from pasted messages
+
+60 labelled messages, layer: regex (LLM_PROVIDER=none). Match top-3 accuracy 1.000, top-1 0.889 (0.878 on the 41 messages a person could resolve from a unique first name).
+
+| Field | Accuracy |
+|---|---|
+| amount | 1.000 |
+| method | 1.000 |
+| reference | 1.000 |
+| payer name guess | 0.960 |
+| language | 1.000 |
+
+| Flag | Precision | Recall |
+|---|---|---|
+| amount mismatch | 1.000 | 1.000 |
+| injected instruction | 1.000 | 1.000 |
+| no payment found | 1.000 | 1.000 |
+
+False auto-confirmation rate 0.000 (a parse never posts a payment). Injection pass rate 1.000 over 3 messages; the ledger was unchanged in 1.000 of them.
+
 ## Limitations and failure modes
 
 - Synthetic data with planted effects; do not read these as production accuracy.
 - Small test set, so slice gaps and confidence intervals are noisy.
-- Isotonic calibration trades ranking (PR-AUC) for probability quality (Brier, ECE).
+- Ranking uses raw scores while display and simulation use calibrated probabilities.
 - The simulation is assumption-based; it does not measure behaviour change.
 - Reminder messages are drafts; a human approves every one before it is sent.
 - Maintenance triage is keyword/LLM assisted; an emergency is always escalated but a human still dispatches the trade.
@@ -131,3 +155,4 @@ Emergency recall 1.000 over 12 emergencies; emergency precision 1.000. Gas smell
 - ![07_sensitivity_heatmap](figures/07_sensitivity_heatmap.png)
 - ![08_guardrail_pass_rates](figures/08_guardrail_pass_rates.png)
 - ![09_triage_scores](figures/09_triage_scores.png)
+- ![10_payment_parsing](figures/10_payment_parsing.png)

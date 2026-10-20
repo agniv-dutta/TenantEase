@@ -278,7 +278,7 @@ add(50, language="hi", style="injection", has_injection=True, expect_payment=Fal
     lease_id=None, amount=None, method=None)
 
 # --- 51-54: no payment at all ---
-add(51, language="en", style="no_payment", expect_payment=False,
+add(51, language="hinglish", style="no_payment", expect_payment=False,
     text="Kaafi maza aaya, kal milte hain.", lease_id=None, amount=None, method=None)
 add(52, language="en", style="no_payment", expect_payment=False,
     text="Hello sir, is the water supply fixed in building 2?", lease_id=None, amount=None, method=None)

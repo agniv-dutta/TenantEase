@@ -135,7 +135,16 @@ def _compute_flags(
 
     if fields.amount is not None:
         top = matches[0] if matches else None
-        if top and top.lease_id in rent_amounts and fields.amount != rent_amounts[top.lease_id]:
+        # Only call out a mismatch when the message itself identifies the
+        # tenant (a name or a unit label). A bare bank credit with no name is
+        # ambiguous by nature and must not be flagged as a wrong amount.
+        identified = bool(fields.unit_hint) or fields.name_confidence >= 0.5
+        if (
+            identified
+            and top
+            and top.lease_id in rent_amounts
+            and fields.amount != rent_amounts[top.lease_id]
+        ):
             flags.append("amount_mismatch")
 
     if not matches:

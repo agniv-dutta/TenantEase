@@ -95,6 +95,7 @@ def load_artifacts(artifacts_dir: Path = ARTIFACTS) -> dict[str, Any]:
         "shap": read_json("shap_top_features.json"),
         "llm_eval": read_json("llm_eval.json"),
         "triage_eval": read_json("triage_eval.json"),
+        "payment_eval": read_json("payment_eval.json"),
         "preds": preds,
     }
 
@@ -299,6 +300,28 @@ def fig_triage(triage_eval: dict, figures_dir: Path) -> Path:
     return _save(fig, figures_dir, "09_triage_scores.png")
 
 
+def fig_payments(payment_eval: dict, figures_dir: Path) -> Path:
+    """10. Field accuracy and match accuracy for pasted-message capture."""
+    fields = payment_eval["field_accuracy"]
+    labels = [
+        ("amount", fields.get("amount", 0.0), INDIGO),
+        ("method", fields.get("method", 0.0), INDIGO),
+        ("reference", fields.get("reference", 0.0), INDIGO_SOFT),
+        ("payer name", fields.get("payer_name_guess", 0.0), INDIGO_SOFT),
+        ("language", fields.get("language", 0.0), INDIGO),
+        ("match top-3", payment_eval["top3_accuracy"], VERDIGRIS),
+    ]
+    fig, ax = plt.subplots(figsize=(7, 3.8))
+    ax.bar([item[0] for item in labels], [item[1] for item in labels], color=[item[2] for item in labels])
+    ax.set_ylim(0, 1.08)
+    ax.set_ylabel("Score")
+    ax.set_title(f"Payment parsing over {payment_eval['n']} pasted messages")
+    for i, (_, value, _) in enumerate(labels):
+        ax.text(i, value + 0.02, f"{value:.2f}", ha="center", color=INDIGO, fontsize=9)
+    _clean(ax)
+    return _save(fig, figures_dir, "10_payment_parsing.png")
+
+
 def render_eval_report(arts: dict[str, Any]) -> str:
     """Assemble docs/eval_report.md from the artifacts, no hand-typed numbers."""
     metrics = arts["metrics"]
@@ -418,6 +441,36 @@ def render_eval_report(arts: dict[str, Any]) -> str:
             "structural cracks are always forced to emergency, so recall does not depend on the model."
         )
         lines.append("")
+    payment_eval = arts.get("payment_eval")
+    if payment_eval:
+        lines.append("## Payment capture from pasted messages")
+        lines.append("")
+        lines.append(
+            f"{payment_eval['n']} labelled messages, layer: {payment_eval['layer']}. "
+            f"Match top-3 accuracy {payment_eval['top3_accuracy']:.3f}, top-1 "
+            f"{payment_eval['top1_accuracy']:.3f} "
+            f"({payment_eval['top1_accuracy_unambiguous']:.3f} on the {payment_eval['unambiguous_n']} "
+            "messages a person could resolve from a unique first name)."
+        )
+        lines.append("")
+        lines.append("| Field | Accuracy |")
+        lines.append("|---|---|")
+        for name, value in payment_eval["field_accuracy"].items():
+            lines.append(f"| {name.replace('_', ' ')} | {value:.3f} |")
+        lines.append("")
+        lines.append("| Flag | Precision | Recall |")
+        lines.append("|---|---|---|")
+        for name, m in payment_eval["flags"].items():
+            lines.append(f"| {name.replace('_', ' ')} | {m['precision']:.3f} | {m['recall']:.3f} |")
+        lines.append("")
+        inj = payment_eval["injection"]
+        lines.append(
+            f"False auto-confirmation rate {payment_eval['false_auto_confirmation_rate']:.3f} "
+            "(a parse never posts a payment). Injection pass rate "
+            f"{inj['pass_rate']:.3f} over {inj['n']} messages; the ledger was unchanged in "
+            f"{inj['ledger_unchanged_rate']:.3f} of them."
+        )
+        lines.append("")
     lines.append("## Limitations and failure modes")
     lines.append("")
     lines.append("- Synthetic data with planted effects; do not read these as production accuracy.")
@@ -430,7 +483,7 @@ def render_eval_report(arts: dict[str, Any]) -> str:
     lines.append("")
     lines.append("## Figures")
     lines.append("")
-    for n in range(1, 10):
+    for n in range(1, 11):
         matches = sorted((DOCS / "figures").glob(f"{n:02d}_*.png"))
         for m in matches:
             lines.append(f"- ![{m.stem}](figures/{m.name})")
@@ -460,6 +513,8 @@ def main(figures_dir: Path = FIGURES, report_path: Path | None = None) -> list[P
         written.append(fig_guardrails(arts["llm_eval"], figures_dir))
     if arts["triage_eval"]:
         written.append(fig_triage(arts["triage_eval"], figures_dir))
+    if arts["payment_eval"]:
+        written.append(fig_payments(arts["payment_eval"], figures_dir))
 
     report = report_path or (DOCS / "eval_report.md")
     report.parent.mkdir(parents=True, exist_ok=True)

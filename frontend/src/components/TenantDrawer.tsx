@@ -3,6 +3,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { api, ApiError } from "../lib/api";
 import { aboutPercentText, formatINR, formatDate, weekdayDate } from "../lib/format";
@@ -32,6 +33,7 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
   const { data, isLoading, error } = useTenant(leaseId);
   const { data: requests } = useMaintenance(leaseId);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [language, setLanguage] = useState("en");
   const [tone, setTone] = useState("friendly");
   const [reminder, setReminder] = useState<Reminder | null>(null);
@@ -187,6 +189,10 @@ export default function TenantDrawer({ leaseId, onClose }: TenantDrawerProps) {
           {showFullHistory ? "Show recent history" : "Show full history"}
         </button>
       )}
+      <div className="controls">
+        <button onClick={() => navigate(`/app/payments?lease_id=${leaseId}`)}>Record payment</button>
+        <span className="small soft">Paste a payment message, check the match, then confirm it.</span>
+      </div>
 
       {!data.cold_start && data.probability != null && data.tier && (
         <>

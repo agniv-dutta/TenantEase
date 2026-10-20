@@ -1,0 +1,16 @@
+
+> frontend@0.0.0 dev
+> vite --host 127.0.0.1
+
+
+  VITE v8.3.4  ready in 652 ms
+
+  ➜  Local:   http://127.0.0.1:5173/
+10:26:03 am [vite] (client) hmr update /src/styles/app.css
+10:27:56 am [vite] (client) hmr update /src/styles/app.css
+10:37:00 am [vite] (client) hmr update /src/pages/PaymentsPage.tsx
+10:37:05 am [vite] (client) hmr update /src/pages/PaymentsPage.tsx
+10:37:10 am [vite] (client) hmr update /src/pages/PaymentsPage.tsx
+10:37:19 am [vite] (client) hmr update /src/components/TenantDrawer.tsx
+10:37:35 am [vite] (client) hmr update /src/components/TenantDrawer.tsx
+10:37:43 am [vite] (client) hmr update /src/components/TenantDrawer.tsx

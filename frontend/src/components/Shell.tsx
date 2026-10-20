@@ -9,6 +9,7 @@ const LINKS = [
   { to: "/app/ledger", label: "Ledger" },
   { to: "/app/portfolio", label: "Portfolio" },
   { to: "/app/audit", label: "Audit" },
+  { to: "/app/payments", label: "Payments" },
   { to: "/app/outlook", label: "Outlook" },
   { to: "/app/outbox", label: "Outbox" },
   { to: "/app/model-notes", label: "Model notes" },

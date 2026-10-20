@@ -164,3 +164,30 @@ export interface AuditEvent {
   summary: string;
   details: Record<string, unknown>;
 }
+
+export interface PaymentParseResult {
+  fields: {
+    payer_name_guess: string | null;
+    amount: number | null;
+    paid_date: string | null;
+    method: string | null;
+    reference: string | null;
+    language: string;
+    confidence: number;
+  };
+  matches: Array<{ lease_id: number; tenant: string; unit: string; cycle_month: string | null; reasons: string[] }>;
+  flags: string[];
+}
+
+export interface PaymentConfirmation {
+  lease_id: number;
+  cycle_month: string;
+  amount: number;
+  paid_date: string;
+  method: string;
+  reference: string | null;
+  days_late: number;
+  status: string;
+  rescored: number;
+  flags: string[];
+}

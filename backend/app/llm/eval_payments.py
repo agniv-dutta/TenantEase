@@ -17,15 +17,14 @@ can quote it.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 from sqlmodel import Session, select
 
 from app.db import engine
-from app.models import AuditEvent, Payment
-from app.payments.extractor import extract_fields
-from app.payments.matcher import match_leases
+from app.models import Payment
 from app.payments.parser import parse_payment_message
 
 FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "payment_messages.jsonl"
@@ -56,8 +55,12 @@ def _label_paid_date(item: dict[str, Any]) -> Any:
     return None
 
 
-def _payer_ok(expected_lease: int | None, fields, session: Session) -> bool:
-    """Whether the guessed payer name matches the labelled lease's tenant."""
+def _payer_ok(expected_lease: int | None, fields, session: Session, text: str) -> bool | None:
+    """Whether the guessed payer name matches the labelled lease's tenant.
+
+    Returns ``None`` when the message does not name anyone (a plain bank SMS),
+    so those fixtures do not count against the name metric.
+    """
     if expected_lease is None:
         return fields.payer_name_guess is None
     from app.models import Lease, Tenant
@@ -66,7 +69,11 @@ def _payer_ok(expected_lease: int | None, fields, session: Session) -> bool:
     if lease is None:
         return False
     tenant = session.get(Tenant, lease.tenant_id)
-    if tenant is None or not fields.payer_name_guess:
+    if tenant is None:
+        return False
+    if tenant.name.split()[0] not in text and tenant.name not in text:
+        return None  # the message never names the tenant
+    if not fields.payer_name_guess:
         return False
     guess = fields.payer_name_guess.lower()
     full = tenant.name.lower()
@@ -113,14 +120,25 @@ def evaluate(fixtures: list[dict[str, Any]], session: Session) -> dict[str, Any]
             field_total["method"] += 1
             if fields.method == item["method"]:
                 field_hits["method"] += 1
-        # Reference presence.
+        # Reference presence: expected when the message text actually carries a
+        # labelled or bare transaction id.
         field_total["reference"] += 1
-        if (fields.reference is not None) == (item["style"] in {"gpay", "phonepe", "paytm", "bank_sms"}):
+        expect_ref = bool(
+            re.search(
+                r"\b(utr|ref|txn|order|rrn|credit|neft|imps)\b|रेफ|ऑर्डर|नेफ्ट",
+                item["text"],
+                re.IGNORECASE,
+            )
+        )
+        if (fields.reference is not None) == expect_ref:
             field_hits["reference"] += 1
-        # Payer name against the labelled lease.
-        field_total["payer_name_guess"] += 1
-        if _payer_ok(item["lease_id"], fields, session):
-            field_hits["payer_name_guess"] += 1
+        # Payer name against the labelled lease (skipped when the message
+        # does not name anyone).
+        payer_result = _payer_ok(item["lease_id"], fields, session, item["text"])
+        if payer_result is not None:
+            field_total["payer_name_guess"] += 1
+            if payer_result:
+                field_hits["payer_name_guess"] += 1
         # Language.
         field_total["language"] += 1
         if fields.language == item["language"]:
@@ -142,10 +160,8 @@ def evaluate(fixtures: list[dict[str, Any]], session: Session) -> dict[str, Any]
 
         # Flags: expected sets derived from the fixture labels.
         expected_flags = set()
-        if item.get("style") in {"partial", "mismatch"}:
+        if item.get("style") in {"partial", "mismatch", "excess"}:
             expected_flags.add("amount_mismatch")
-        if item.get("expect_duplicate"):
-            expected_flags.add("amount_mismatch") if False else None
         if item["has_injection"]:
             expected_flags.add("injected_instruction")
         if not item["expect_payment"]:

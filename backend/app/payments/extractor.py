@@ -64,6 +64,16 @@ METHOD_KEYWORDS: list[tuple[str, str]] = [
     ("नकद", "cash"),
     ("कैश", "cash"),
     ("यूपीआई", "upi"),
+    # A bank alert with no app name is still a bank transfer.
+    ("credited", "bank_transfer"),
+    ("credit", "bank_transfer"),
+    ("जमा", "bank_transfer"),
+    ("क्रेडिट", "bank_transfer"),
+    ("sbi", "bank_transfer"),
+    ("hdfc", "bank_transfer"),
+    ("icici", "bank_transfer"),
+    ("axis bank", "bank_transfer"),
+    ("kotak", "bank_transfer"),
 ]
 
 CASH_HINTS = ("cash", "nakad", "नकद", "कैश", "हाथ", "हाथों")
@@ -194,7 +204,7 @@ REF_LABELLED_RE = re.compile(
     r"[\s:#.\-]*(?:id|no|number|संदर्भ)?[\s:#.\-]*([A-Za-z0-9]{6,22})",
     re.IGNORECASE,
 )
-REF_BARE_RE = re.compile(r"\b([A-Z]{2,5}\d{6,16}|\d{8,16})\b")
+REF_BARE_RE = re.compile(r"\b([A-Z]{2,5}\d{5,16}|\d{6,16})\b")
 
 
 def _find_reference(text: str) -> str | None:
@@ -215,10 +225,10 @@ def _find_reference(text: str) -> str | None:
 DEVANAGARI_RE = re.compile(r"[ऀ-ॿ]")
 # A unit label like "MAN-02" or "MAL-07" that tenants often quote in a message.
 UNIT_LABEL_RE = re.compile(r"\b([A-Z]{3}-\d{1,3})\b")
-DEVANAGARI_NAME_RE = re.compile(r"[ऀ-ॿ]{3,}")
 HINGLISH_HINTS = (
     "bhej", "bheja", "jama", "kiraya", "kar diya", "kar di", "hua", "aaya",
     "bhai", "kaun", "hai", "ho gaya", "paisa", "paise", "bhar diya", "de diya",
+    "kiya", " ko ", "ne ", "kal,", "milte",
 )
 HINDI_PAY_HINTS = ("भेज", "जमा", "किराया", "दिया", "हो गया", "पैसा", "रुपये")
 
@@ -276,7 +286,40 @@ def _acceptable(candidate: str) -> bool:
         return False
     if len(candidate) < 3:
         return False
-    return candidate[:1].isupper() or DEVANAGARI_RE.search(candidate) is not None
+    # An English name starts with a capital; a Devanagari one is accepted only
+    # when it arrives through a labelled or sign-off position (see below).
+    return candidate[:1].isupper()
+
+
+# Hindi function words that a token-regex would otherwise mistake for a name.
+HINDI_STOPWORDS = {
+    "है", "हैं", "हो", "हुआ", "को", "को।", "में", "में।", "का", "की", "के",
+    "ने", "से", "और", "पर", "यह", "वह", "दिया", "दिया।", "किया", "किया।",
+    "भेजा", "भेजा।", "भेज", "जमा", "किराया", "रुपये", "धन्यवाद", "रेफ", "रेफ।",
+    "ऑर्डर", "नमस्ते", "सर", "जी", "क्रेडिट", "भुगतान", "सफल", "आपने", "आपके",
+}
+
+
+def _english_or_labelled_devanagari(candidate: str) -> bool:
+    """Validate a name that arrived through a labelled or sign-off position.
+
+    In these positions a capitalised English word is trusted even if it
+    collides with a lowercase Hindi verb spelling (for example "Diya"), but
+    bank acronyms (all caps) and known stopwords are still rejected, and a
+    Devanagari word must not be a common function/verb.
+    """
+    if DEVANAGARI_RE.search(candidate):
+        low = candidate.strip("।.,")
+        return low not in HINDI_STOPWORDS and len(low) >= 2
+    low = candidate.lower()
+    if low in NAME_STOPWORDS or low in MONTH_NAMES or low in NAME_NOISE:
+        return False
+    if len(candidate) < 3:
+        return False
+    # All-caps tokens (NEFT, IMPS, UPI, RTGS) are acronyms, not names.
+    if candidate.isupper():
+        return False
+    return candidate[:1].isupper()
 
 
 def guess_payer_name(text: str) -> tuple[str | None, float]:
@@ -287,29 +330,29 @@ def guess_payer_name(text: str) -> tuple[str | None, float]:
     how the name was found.
     """
     labelled = re.search(
-        r"(?:from|sender|by|to|bheja|bheji|ne|ney|ने|को|से)\s*[:\-]?\s*"
-        r"([A-Z][A-Za-z]{2,}|[ऀ-ॿ]{2,})",
+        r"\b(?:from|sender|by|to|bheja|bheji|ne|ney)\b\s*[:\-]?\s*"
+        r"([A-Z][A-Za-z]{2,}|[ऀ-ॿ]{2,})"
+        r"|(?:ने|को|से)\s*[:\-]?\s*([A-Z][A-Za-z]{2,}|[ऀ-ॿ]{2,})",
         text,
     )
     if labelled:
-        candidate = _clean_name(labelled.group(1))
-        if _acceptable(candidate):
+        candidate = _clean_name(labelled.group(1) or labelled.group(2))
+        if _english_or_labelled_devanagari(candidate):
             return candidate, 0.8
     # A sign-off line: "... - Rahul" or "— Rahul".
     signoff = re.search(r"[-–—]\s*([A-Z][A-Za-z]{2,}|[ऀ-ॿ]{2,})\s*[.।]?\s*$", text.strip())
     if signoff:
         candidate = _clean_name(signoff.group(1))
-        if _acceptable(candidate):
+        if _english_or_labelled_devanagari(candidate):
             return candidate, 0.75
-    # Otherwise take the last acceptable capitalised (or Devanagari) token:
-    # people usually sign off at the end of a message.
-    tokens = [t for t in NAME_TOKEN_RE.findall(text)]
-    tokens += DEVANAGARI_NAME_RE.findall(text)
+    # Otherwise take the last acceptable capitalised English token: people
+    # usually sign off at the end of a message.
+    tokens = NAME_TOKEN_RE.findall(text)
     for token in reversed(tokens):
         cleaned = _clean_name(token)
         if not _acceptable(cleaned):
             continue
-        if token[:1].isupper() or DEVANAGARI_RE.search(token):
+        if token[:1].isupper():
             return cleaned, 0.45
     return None, 0.0
 
@@ -356,6 +399,7 @@ class ExtractedFields:
     reference: str | None = None
     language: str = "en"
     unit_hint: str | None = None
+    name_confidence: float = 0.0
     confidence: float = 0.0
     has_payment_signal: bool = False
     injection: bool = False
@@ -449,6 +493,7 @@ def extract_fields(text: str) -> ExtractedFields:
         reference=reference,
         language=language,
         unit_hint=unit_hint,
+        name_confidence=name_conf,
         confidence=confidence,
         has_payment_signal=has_signal,
         injection=injection,

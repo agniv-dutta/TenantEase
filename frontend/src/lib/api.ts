@@ -3,6 +3,8 @@
 import type {
   Guardrail,
   AuditEvent,
+  PaymentConfirmation,
+  PaymentParseResult,
   LedgerResponse,
   MaintenanceRequest,
   ModelCardResponse,
@@ -75,6 +77,10 @@ export const api = {
   editReminder: (id: number, message: string) =>
     request<Reminder>(`/api/reminders/${id}/edit`, { method: "PUT", body: JSON.stringify({ message }) }),
   auditEvents: () => request<AuditEvent[]>("/api/audit"),
+  parsePayment: (text: string) =>
+    request<PaymentParseResult>("/api/payments/parse", { method: "POST", body: JSON.stringify({ text }) }),
+  recordPayment: (payload: { lease_id: number; cycle_month: string; amount: number; paid_date: string; method: string; reference?: string | null }) =>
+    request<PaymentConfirmation>("/api/payments/record", { method: "POST", body: JSON.stringify(payload) }),
   checkMessage: (leaseId: number, language: string, message: string) =>
     request<Guardrail[]>("/api/reminders/check", {
       method: "POST",

@@ -1,122 +1,102 @@
-# TenantEase Khata
+﻿# TenantEase Khata
 
-A rent-ledger prototype for small landlords. It reads the last few months of rent
-payments, works out which leases are likely to pay late in the coming cycle, and
-helps a manager send a well-timed, human reminder. The risk score only decides how
-early and how personally to remind someone; it never decides rent, eviction, or
-whether to take a tenant.
+TenantEase Khata is a synthetic-data prototype for rent collection: it turns a manager's historical payment ledger into a leak-safe late-payment reminder worklist, lets the manager inspect reasons and a reminder plan, drafts a guarded message, and requires human approval; scores are for reminder scheduling only and are never used for eviction, rent pricing, or tenant screening.
 
-## The opportunity in three sentences
+**Live demo:** Not deployed. Run the local demo with the commands below. Set the link here when a public deployment is available.
 
-Small landlords lose time chasing rent after it is late, when a single well-timed
-message a few days earlier would have been enough. The signal to act is already in
-their own payment history. This prototype turns that history into a short daily
-worklist and a ready draft message, so the follow-up happens before the arrears
-build up.
+**Colab:** [Reproduce the synthetic model evaluation](https://colab.research.google.com/github/agniv-dutta/TenantEase/blob/main/notebooks/tenantease_demo.ipynb)
+
+## Evaluation metrics
+
+<!-- metrics:start -->
+| Model | PR-AUC | ROC-AUC | Brier score | Top 10% precision |
+|---|---:|---:|---:|---:|
+| Shipped calibrated model | 0.3180 | 0.6882 | 0.1313 | 0.4423 |
+| Late-last-cycle baseline | 0.2754 | 0.6534 | 0.1913 | 0.4615 |
+
+Evaluation set: 528 lease-cycle rows; base rate 0.1667. Synthetic data only; not a forecast of production accuracy.
+<!-- metrics:end -->
+
+The table above is generated from `backend/app/ml/artifacts/metrics.json`. Refresh it after evaluation with:
+
+```sh
+python backend/scripts/update_readme_metrics.py
+```
+
+All metrics are from seeded synthetic data. They are not evidence of production accuracy or tenant outcomes. See the [model card](docs/model_card.md) and [evaluation report](docs/eval_report.md).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  synth["Synthetic data<br/>seed 42"] --> db[("SQLite<br/>khata.db")]
-  db --> features["Leak-safe features<br/>as-of timestamp"]
-  features --> model["LightGBM model<br/>+ isotonic calibration"]
-  model --> api["FastAPI"]
-  db --> api
-  api --> web["React + Vite<br/>ledger, outlook, outbox, model notes"]
-  api --> llm["LLM drafter<br/>templates when no key"]
-  llm --> guardrails["Guardrails<br/>no threats, correct script"]
-  guardrails --> web
+  seed["Faker en_IN<br/>seed 42"] --> db[("SQLite ledger")]
+  db --> feat["As-of feature builder<br/>leakage-tested"]
+  feat --> train["Train + calibrate"]
+  train --> model["Risk score<br/>reminder timing only"]
+  db --> api["FastAPI"]
+  model --> api
+  api --> ui["React + TypeScript<br/>ledger · portfolio · outlook"]
+  ui --> rem["Reminder draft + approval"]
+  rem --> guard["Message guardrails"]
+  ui --> pay["Payment parse + confirmation"]
+  api --> audit["Append-only audit"]
+  llm["Optional LLM<br/>template fallback"] --> guard
+  guard --> ui
 ```
 
-- **Backend** (`backend/`): FastAPI, SQLModel/SQLite, pandas, scikit-learn,
-  LightGBM, SHAP. Synthetic data, feature pipeline, model, evaluation, reminder
-  planner, LLM drafter, and a maintenance triage module (keyword fallback,
-  JSON-validated LLM path, and a hard safety rule that forces gas smell, sparks,
-  fire, flooding or structural cracks to emergency).
-- **Frontend** (`frontend/`): Vite + React + TypeScript. Plain CSS driven only by
-  `src/styles/tokens.css`. Hand-built SVG for the stamps, the risk stroke and the
-  charts. No UI kit, no chart library, no Tailwind.
+- `backend/`: FastAPI, SQLModel, SQLite, seed generator, feature pipeline, LightGBM, calibration and evaluation.
+- `frontend/`: Vite, React, TypeScript, token-based CSS and hand-built SVG charts.
+- `docs/`: synthetic data description, model card, evaluation report, opportunity and technical approach reports, screenshots and submission checklist.
 
 ## Quick start
 
 ```sh
-make setup     # install backend and frontend dependencies
-make seed      # generate the synthetic SQLite database
-make train     # build features and train the model
-make eval      # write metrics, slices, model card, llm eval, triage eval
-make report-assets   # figures into docs/figures, docs/eval_report.md
+make setup
+make seed
+make train
+make eval
+make api       # terminal 1
+make web       # terminal 2
 ```
 
-Then run the two servers in separate terminals:
+The app opens at `http://localhost:5173`. `make check` runs the backend and frontend checks. `docker compose up --build` starts the local demo on port 8080. No LLM key is required; the reminder drafter falls back to templates.
 
-```sh
-make api       # FastAPI on http://localhost:8000
-make web       # Vite dev server on http://localhost:5173
-```
+## Two-minute keyboard demo
 
-`make check` runs ruff, pytest, `tsc` and the frontend build.
+Start at the landing page and use the keyboard throughout:
 
-### One command with Docker
+1. Tab to **Open the ledger** and press Enter. The ledger is sorted highest risk first.
+2. Tab through the ledger rows to the first high-risk lease and press Enter. Read **Why this score** and the reminder plan in the drawer.
+3. Tab to **Language**, choose **Hinglish**, then Tab to **Draft reminder** and press Enter. Review the message and checks; Tab to **Approve** and press Enter.
+4. Tab to **Payments** in the left navigation. Paste a synthetic payment message, parse it, review the candidate and fields, then confirm the payment.
+5. Open **Portfolio** and review occupancy, collection efficiency, revenue and vacancies.
+6. Open **Outlook**, Tab to both sliders, and adjust them with the arrow keys. The what-if is assumption-based, not measured.
+7. Open **Model notes** and read **What this does not show**.
 
-```sh
-docker compose up --build
-```
-
-This seeds, trains and serves the app at http://localhost:8080 with no API key
-needed. The backend image runs the same pipeline and reuses trained artifacts on
-restart.
-
-## Environment variables
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `DATABASE_URL` | `sqlite:///backend/data/khata.db` | Database location |
-| `SEED` | `42` | Seed for reproducible synthetic data |
-| `LLM_PROVIDER` | `none` | `none`, `anthropic`, `openai` or `ollama` |
-| `LLM_MODEL` | `claude-3-5-haiku-latest` | Model name for the chosen provider |
-| `ANTHROPIC_API_KEY` | — | Key variable when `LLM_PROVIDER=anthropic` |
-| `OPENAI_API_KEY` | — | Key variable when `LLM_PROVIDER=openai` |
-| `USE_OCCUPATION` | `true` | Whether occupation type is a model feature (ablation flag) |
-| `ENABLE_ADMIN_RESEED` | `false` | Gates the dev-only reseed endpoint |
-
-With `LLM_PROVIDER=none` the drafter uses templates, so the whole demo runs
-offline. If a provider is set but fails or returns text that breaks a guardrail,
-the drafter retries once and then falls back to a template; the drawer says so.
+Nothing sends a message automatically. The demo dataset may be changed by a payment confirmation; `make seed` restores it.
 
 ## What is synthetic
 
-Everything. Names, units, rents, payments and messages are generated by Faker
-(`en_IN`) with a fixed seed. There is no real tenant data anywhere. The model card
-and the eval report say plainly that the metrics come from planted effects and are
-not a forecast of production accuracy.
+All tenants, properties, units, payment messages and rent outcomes in the demo are generated. Tenant names and phone numbers use Faker's `en_IN` locale; the seed defaults to 42. The data generator plants known payment-risk effects and deterministic vacancy gaps. See [`docs/synthetic_data.md`](docs/synthetic_data.md). Payment parser fixtures are generated from synthetic seeded tenants. No real tenant records are used.
 
-## The 90-second demo
+## What is assumed
 
-1. Open the ledger and watch the stamps land on the current cycle.
-2. Tick "Highest risk first" and read the late-risk strokes at the end of each row.
-3. Open a high-risk tenant and read "Why this score" in plain sentences.
-4. Read the reminder plan: which day, which channel, friendly or neutral.
-5. Draft a Hinglish message, watch the guardrails pass, and edit a line to see a
-   guardrail fail and block approval.
-6. Press "Approve reminder" and see the APPROVED stamp land.
-7. Open Outlook and move the two follow-up sliders (the label stays
-   "Assumption-based, not measured").
-8. Open Model notes and read "What this does not show".
-9. In the same drawer, add a maintenance request such as "gas leak smell in the
-   kitchen" and watch the safety rule escalate it to emergency.
+- The 5-day grace window defines on-time collection for collection-efficiency reporting.
+- The current-cycle outlook and reminder what-if use model probabilities and an assumed effect; no reminder treatment effect has been measured.
+- The payment parser ranks possible leases but cannot confirm a payment. A manager selects and confirms the record.
+- The score supports reminder scheduling only. Every message requires review and approval.
 
-Screenshots for each page at 1440px and 390px live in `docs/screenshots`.
+## Limitations
 
-## Honest answers to likely questions
+The model and parser are evaluated on synthetic, planted data. This does not establish real-world accuracy, fairness, causal impact, or suitability for decisions about a tenant. The app has no production identity, access control, payment-provider integration, or deployment hardening. External demo hosting is required for the live link above; the local quick start is not a public deployment.
 
-- **Is the model good?** On synthetic data it beats a rule baseline on PR-AUC and
-  sits in the 0.78 to 0.86 ROC-AUC range. That shows the pipeline works, nothing
-  more.
-- **Does it prove reminders help?** No. The what-if on the outlook page is
-  assumption based. Measuring a nudge needs a real A/B test.
-- **What about fairness?** Name, phone, property, locality and language are not
-  features. Occupation type is allowed but ablated in the model card. The score
-  drives scheduling only, never a decision about a person.
-- **What if there is no API key?** The app falls back to templates that already
-  pass every guardrail, so the demo is fully offline.
+## Reports and artifacts
+
+- [AI Opportunity Report](docs/ai_opportunity_report.md)
+- [Technical Approach Report](docs/technical_approach_report.md)
+- [Synthetic data process](docs/synthetic_data.md)
+- [Model card](docs/model_card.md)
+- [Evaluation report](docs/eval_report.md)
+- [Submission checklist](docs/submission_checklist.md)
+- [Colab notebook source](notebooks/tenantease_demo.ipynb)
+- [Screenshots](docs/screenshots/)

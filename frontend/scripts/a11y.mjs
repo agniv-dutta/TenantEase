@@ -4,7 +4,17 @@ import { chromium } from "playwright";
 import { AxeBuilder } from "@axe-core/playwright";
 
 const baseUrl = process.argv[2] ?? "http://localhost:5173";
-const PAGES = ["/", "/outlook", "/outbox", "/model-notes"];
+const PAGES = [
+  "/",
+  "/app/ledger",
+  "/app/portfolio",
+  "/app/payments",
+  "/app/audit",
+  "/app/outlook",
+  "/app/outbox",
+  "/app/model-notes",
+  "/app/foundation",
+];
 
 const browser = await chromium.launch({ channel: "msedge" });
 let failures = 0;
@@ -17,7 +27,7 @@ try {
   });
   const page = await context.newPage();
   for (const path of PAGES) {
-    await page.goto(baseUrl + path, { waitUntil: "networkidle" });
+    await page.goto(baseUrl + path, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(600);
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => ["serious", "critical"].includes(v.impact));

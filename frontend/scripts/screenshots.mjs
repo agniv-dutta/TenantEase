@@ -7,11 +7,13 @@ const baseUrl = process.argv[2] ?? "http://127.0.0.1:5173";
 const outDir = process.argv[3] ?? "../docs/screenshots";
 
 const PAGES = [
-  ["ledger", "/"],
-  ["outlook", "/outlook"],
-  ["outbox", "/outbox"],
-  ["model-notes", "/model-notes"],
-  ["foundation", "/foundation"],
+  ["landing", "/"],
+  ["ledger", "/app/ledger"],
+  ["outlook", "/app/outlook"],
+  ["outbox", "/app/outbox"],
+  ["portfolio", "/app/portfolio"],
+  ["payments", "/app/payments"],
+  ["model-notes", "/app/model-notes"],
 ];
 
 const VIEWPORTS = [
@@ -29,10 +31,10 @@ try {
     for (const [name, path] of PAGES) {
       await page.goto(baseUrl + path, { waitUntil: "domcontentloaded" });
       await page.locator(".page-title").first().waitFor();
-      if (path === "/") await page.locator(".ledger tbody tr").first().waitFor({ timeout: 60000 });
-      if (path === "/outlook") await page.locator(".chart-svg").waitFor();
-      if (path === "/outbox") await page.locator("article").first().waitFor({ timeout: 10000 }).catch(() => undefined);
-      if (path === "/model-notes") await page.locator(".chart-svg").waitFor();
+      if (path === "/app/ledger") await page.locator(".ledger tbody tr").first().waitFor({ timeout: 60000 });
+      if (path === "/app/outlook") await page.locator(".chart-svg").waitFor();
+      if (path === "/app/outbox") await page.locator("article").first().waitFor({ timeout: 10000 }).catch(() => undefined);
+      if (path === "/app/model-notes") await page.locator(".chart-svg").waitFor();
       await page.waitForTimeout(1200); // let the stamps settle
       await page.screenshot({ path: `${outDir}/${name}-${width}.png`, fullPage: false });
       console.log(`shot ${name}-${width}`);
