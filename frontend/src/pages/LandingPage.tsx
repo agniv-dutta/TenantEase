@@ -7,6 +7,7 @@ import type { LedgerRow, ModelCardResponse } from "../lib/types";
 
 const sampleRows = sample.rows as LedgerRow[];
 
+/** Render the API-independent product overview and its optional live metrics. */
 export default function LandingPage() {
   const [spotlight, setSpotlight] = useState<number | null>(null);
   const [model, setModel] = useState<ModelCardResponse | null>(null);

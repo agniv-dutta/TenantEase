@@ -36,6 +36,8 @@ class Unit(SQLModel, table=True):
     bhk: int
     rent_inr: int
     floor: int
+    status: str = "vacant"  # occupied | vacant | notice_given
+    vacant_since: date | None = None
 
 
 class Tenant(SQLModel, table=True):
@@ -131,3 +133,20 @@ class Meta(SQLModel, table=True):
     __tablename__ = "meta"
     key: str = Field(primary_key=True)
     value: str
+
+
+class AuditEvent(SQLModel, table=True):
+    """An append-only log of actions that change payment records.
+
+    Recording a pasted payment is never allowed to happen silently, so every
+    accepted or rejected attempt leaves a row here with what was decided and
+    why.
+    """
+
+    __tablename__ = "audit_events"
+    id: int | None = Field(default=None, primary_key=True)
+    event_type: str = Field(index=True)  # payment_recorded | payment_rejected
+    lease_id: int | None = Field(default=None, index=True)
+    cycle_month: date | None = None
+    detail_json: str = "{}"
+    created_at: datetime = Field(default_factory=_demo_now)

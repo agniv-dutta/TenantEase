@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     llm_provider: str = "none"  # anthropic | openai | ollama | none
     llm_model: str = "claude-3-5-haiku-latest"
 
+    # Payment parsing
+    payment_match_cutoff: float = 55.0  # minimum name score (0-100) to list a candidate
+
     # Admin
     enable_admin_reseed: bool = False
 

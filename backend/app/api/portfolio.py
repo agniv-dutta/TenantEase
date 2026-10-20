@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import calendar
-from datetime import date
+from datetime import date, timedelta
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,10 +12,82 @@ from sqlmodel import Session, select
 from app import clock
 from app.db import get_session
 from app.ml.scoring import current_cycle
-from app.models import Lease, Payment, Property, RiskScore
+from app.models import Lease, Payment, Property, RiskScore, Unit
 from app.schemas import OutlookPoint, OutlookResponse, PortfolioSummary, TierCounts
 
 router = APIRouter()
+
+
+@router.get("/occupancy")
+def occupancy(session: Session = Depends(get_session)) -> dict:
+    """Return current occupancy grouped by property and vacant unit detail."""
+    today = clock.today()
+    properties = session.exec(select(Property)).all()
+    units = session.exec(select(Unit)).all()
+    leases = session.exec(select(Lease)).all()
+    active_by_unit: dict[int, Lease] = {}
+    for lease in leases:
+        if lease.start_date <= today and (lease.end_date is None or lease.end_date >= today):
+            active_by_unit[lease.unit_id] = lease
+    props = []
+    vacant = []
+    for prop in properties:
+        rows = [u for u in units if u.property_id == prop.id]
+        occupied = sum(u.id in active_by_unit for u in rows)
+        props.append({"property_id": prop.id, "property": prop.name, "units": len(rows), "occupied": occupied,
+                      "vacant": len(rows)-occupied, "occupancy_rate": occupied / len(rows) if rows else 0})
+        for unit in rows:
+            if unit.id not in active_by_unit:
+                start = unit.vacant_since or today
+                vacant.append({"unit": unit.label, "property": prop.name, "bhk": unit.bhk,
+                               "rent_inr": unit.rent_inr, "vacant_since": start,
+                               "days_vacant": max(0, (today-start).days)})
+    total_units = len(units)
+    total_occupied = len(active_by_unit)
+    return {"properties": props, "total": {"units": total_units, "occupied": total_occupied,
+            "vacant": total_units-total_occupied, "occupancy_rate": total_occupied/total_units if total_units else 0},
+            "vacant_units": sorted(vacant, key=lambda x: x["days_vacant"], reverse=True),
+            "as_of_date": today}
+
+
+@router.get("/revenue")
+def revenue(months: int = 24, session: Session = Depends(get_session)) -> dict:
+    """Return billed and collected rent totals for recent ledger cycles."""
+    if not 1 <= months <= 60:
+        raise HTTPException(status_code=422, detail={"code": "invalid_months", "message": "Months must be between 1 and 60."})
+    current = current_cycle(session)
+    first = _month_offset(current, -(months - 1))
+    payments = session.exec(select(Payment).where(Payment.cycle_month >= first, Payment.cycle_month <= current)).all()
+    cycles = []
+    for i in range(months):
+        cycle = _month_offset(first, i)
+        rows = [p for p in payments if p.cycle_month == cycle]
+        cycles.append({"cycle_month": cycle, "billed": sum(p.amount for p in rows),
+                       "collected": sum(p.amount for p in rows if p.paid_date is not None),
+                       "within_grace": sum(p.amount for p in rows if p.paid_date is not None and p.paid_date <= p.due_date + timedelta(days=5))})
+    return {"months": cycles, "as_of_date": clock.today()}
+
+
+@router.get("/collection-efficiency")
+def collection_efficiency(session: Session = Depends(get_session)) -> dict:
+    """Return monthly on-time collection share and risk-model open-cycle forecast."""
+    series = revenue(25, session)
+    months = [{"cycle_month": row["cycle_month"], "billed": row["billed"], "within_grace": row["within_grace"],
+               "share": row["within_grace"] / row["billed"] if row["billed"] else 0.0}
+              for row in series["months"][:-1]]
+    current = current_cycle(session)
+    rows = session.exec(select(Payment).where(Payment.cycle_month == current)).all()
+    scores = {s.lease_id: s for s in session.exec(select(RiskScore).where(RiskScore.cycle_month == current)).all()}
+    billed = sum(p.amount for p in rows)
+    expected = sum(p.amount * (1 - scores[p.lease_id].probability if p.lease_id in scores else 1.0) for p in rows)
+    return {"months": months, "forecast": {"cycle_month": current, "billed": billed,
+            "expected_within_grace": expected, "share": expected / billed if billed else 0.0}, "as_of_date": clock.today()}
+
+
+def _month_offset(value: date, offset: int) -> date:
+    """Return the first day of a month offset from value."""
+    index = value.year * 12 + value.month - 1 + offset
+    return date(index // 12, index % 12 + 1, 1)
 
 
 @router.get("/spotlight")

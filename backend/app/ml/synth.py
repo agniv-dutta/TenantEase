@@ -375,6 +375,24 @@ def write_db(db_path: str, seed: int) -> dict[str, int | str]:
     cycles = [month_add(open_cycle, -(n_closed_cycles - i)) for i in range(n_closed_cycles)]
 
     properties, units, tenants, spells = build_structure(seed, n_closed_cycles, open_cycle)
+    # Add a few notice periods after the demo date; these remain active in the
+    # ledger window and are still occupied for current occupancy reporting.
+    active_spells = [spell for spell in spells if spell.end_date is None]
+    for spell in active_spells[::37][:3]:
+        spell.end_date = demo_today + timedelta(days=30)
+    by_unit: dict[int, list[LeaseSpell]] = {}
+    for spell in spells:
+        by_unit.setdefault(spell.unit_id, []).append(spell)
+    for unit in units:
+        history = sorted(by_unit.get(unit.id, []), key=lambda item: item.start_date)
+        current = next((spell for spell in reversed(history)
+                        if spell.start_date <= demo_today and (spell.end_date is None or spell.end_date >= demo_today)), None)
+        if current:
+            unit.status = "notice_given" if current.end_date is not None else "occupied"
+            unit.vacant_since = None
+        else:
+            unit.status = "vacant"
+            unit.vacant_since = (history[-1].end_date + timedelta(days=1)) if history and history[-1].end_date else month_add(open_cycle, -n_closed_cycles)
     intercept = tune_intercept(units, tenants, spells, cycles, seed)
     outcomes = simulate_outcomes(units, tenants, spells, cycles, intercept, seed + 1)
 

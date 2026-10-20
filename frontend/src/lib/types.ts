@@ -7,7 +7,8 @@ export type CellStatus =
   | "paid_late"
   | "unpaid_overdue"
   | "unpaid_upcoming"
-  | "open";
+  | "open"
+  | "vacant";
 
 export interface PaymentCell {
   cycle_month: string;

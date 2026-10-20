@@ -1,9 +1,253 @@
 {
   "cycle_month": "2026-10-01",
   "rows": [
-    {"lease_id": 1,"tenant_name":"Tenant 01","unit_label":"A-01","property_name":"Sample building","property_id":1,"occupation_type":"service","preferred_language":"en","preferred_channel":"sms","cycles":[{"cycle_month":"2026-06-01","due_date":"2026-06-05","status":"paid_on_time","paid_date":"2026-06-04","days_late":0,"amount":18000},{"cycle_month":"2026-07-01","due_date":"2026-07-05","status":"paid_late","paid_date":"2026-07-09","days_late":4,"amount":18000},{"cycle_month":"2026-08-01","due_date":"2026-08-05","status":"paid_on_time","paid_date":"2026-08-05","days_late":0,"amount":18000},{"cycle_month":"2026-09-01","due_date":"2026-09-05","status":"paid_late","paid_date":"2026-09-12","days_late":7,"amount":18000}],"current":{"cycle_month":"2026-10-01","due_date":"2026-10-05","status":"open","paid_date":null,"days_late":null,"amount":18000,"probability":0.71,"tier":"high"}},
-    {"lease_id": 2,"tenant_name":"Tenant 02","unit_label":"A-02","property_name":"Sample building","property_id":1,"occupation_type":"salaried","preferred_language":"hi","preferred_channel":"whatsapp","cycles":[{"cycle_month":"2026-06-01","due_date":"2026-06-05","status":"paid_on_time","paid_date":"2026-06-05","days_late":0,"amount":22000},{"cycle_month":"2026-07-01","due_date":"2026-07-05","status":"paid_on_time","paid_date":"2026-07-03","days_late":0,"amount":22000},{"cycle_month":"2026-08-01","due_date":"2026-08-05","status":"paid_late","paid_date":"2026-08-08","days_late":3,"amount":22000},{"cycle_month":"2026-09-01","due_date":"2026-09-05","status":"paid_on_time","paid_date":"2026-09-04","days_late":0,"amount":22000}],"current":{"cycle_month":"2026-10-01","due_date":"2026-10-05","status":"open","paid_date":null,"days_late":null,"amount":22000,"probability":0.34,"tier":"medium"}},
-    {"lease_id": 3,"tenant_name":"Tenant 03","unit_label":"B-01","property_name":"Sample building","property_id":1,"occupation_type":"business","preferred_language":"hinglish","preferred_channel":"sms","cycles":[{"cycle_month":"2026-06-01","due_date":"2026-06-05","status":"paid_late","paid_date":"2026-06-10","days_late":5,"amount":16000},{"cycle_month":"2026-07-01","due_date":"2026-07-05","status":"paid_late","paid_date":"2026-07-13","days_late":8,"amount":16000},{"cycle_month":"2026-08-01","due_date":"2026-08-05","status":"paid_on_time","paid_date":"2026-08-05","days_late":0,"amount":16000},{"cycle_month":"2026-09-01","due_date":"2026-09-05","status":"paid_late","paid_date":"2026-09-10","days_late":5,"amount":16000}],"current":{"cycle_month":"2026-10-01","due_date":"2026-10-05","status":"open","paid_date":null,"days_late":null,"amount":16000,"probability":0.62,"tier":"high"}},
-    {"lease_id": 4,"tenant_name":"Tenant 04","unit_label":"B-02","property_name":"Sample building","property_id":1,"occupation_type":"salaried","preferred_language":"en","preferred_channel":"whatsapp","cycles":[{"cycle_month":"2026-06-01","due_date":"2026-06-05","status":"paid_on_time","paid_date":"2026-06-05","days_late":0,"amount":25000},{"cycle_month":"2026-07-01","due_date":"2026-07-05","status":"paid_on_time","paid_date":"2026-07-05","days_late":0,"amount":25000},{"cycle_month":"2026-08-01","due_date":"2026-08-05","status":"paid_on_time","paid_date":"2026-08-05","days_late":0,"amount":25000},{"cycle_month":"2026-09-01","due_date":"2026-09-05","status":"paid_on_time","paid_date":"2026-09-04","days_late":0,"amount":25000}],"current":{"cycle_month":"2026-10-01","due_date":"2026-10-05","status":"open","paid_date":null,"days_late":null,"amount":25000,"probability":0.12,"tier":"low"}}
+    {
+      "lease_id": 113,
+      "tenant_name": "Dayita Puri",
+      "unit_label": "JAG-19",
+      "property_name": "Gulmohar Villa",
+      "property_id": 4,
+      "occupation_type": "gig",
+      "preferred_language": "en",
+      "preferred_channel": "whatsapp",
+      "cycles": [
+        {
+          "cycle_month": "2026-07-01",
+          "due_date": "2026-07-01",
+          "status": "paid_late",
+          "paid_date": "2026-07-07",
+          "days_late": 6,
+          "amount": 29000,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-08-01",
+          "due_date": "2026-08-01",
+          "status": "paid_late",
+          "paid_date": "2026-08-07",
+          "days_late": 6,
+          "amount": 29000,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-09-01",
+          "due_date": "2026-09-01",
+          "status": "paid_late",
+          "paid_date": "2026-09-07",
+          "days_late": 6,
+          "amount": 29000,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-10-01",
+          "due_date": "2026-10-01",
+          "status": "open",
+          "paid_date": null,
+          "days_late": null,
+          "amount": 29000,
+          "probability": null,
+          "tier": null
+        }
+      ],
+      "current": {
+        "cycle_month": "2026-10-01",
+        "due_date": "2026-10-01",
+        "status": "open",
+        "paid_date": null,
+        "days_late": null,
+        "amount": 29000,
+        "probability": 0.75,
+        "tier": "high"
+      }
+    },
+    {
+      "lease_id": 118,
+      "tenant_name": "Zaitra Dash",
+      "unit_label": "C-S-01",
+      "property_name": "Amber Heights",
+      "property_id": 5,
+      "occupation_type": "student",
+      "preferred_language": "hi",
+      "preferred_channel": "call",
+      "cycles": [
+        {
+          "cycle_month": "2026-07-01",
+          "due_date": "2026-07-05",
+          "status": "vacant",
+          "paid_date": null,
+          "days_late": null,
+          "amount": 0,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-08-01",
+          "due_date": "2026-08-05",
+          "status": "vacant",
+          "paid_date": null,
+          "days_late": null,
+          "amount": 0,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-09-01",
+          "due_date": "2026-09-05",
+          "status": "vacant",
+          "paid_date": null,
+          "days_late": null,
+          "amount": 0,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-10-01",
+          "due_date": "2026-10-05",
+          "status": "open",
+          "paid_date": null,
+          "days_late": null,
+          "amount": 13000,
+          "probability": null,
+          "tier": null
+        }
+      ],
+      "current": {
+        "cycle_month": "2026-10-01",
+        "due_date": "2026-10-05",
+        "status": "open",
+        "paid_date": null,
+        "days_late": null,
+        "amount": 13000,
+        "probability": 0.75,
+        "tier": "high"
+      }
+    },
+    {
+      "lease_id": 45,
+      "tenant_name": "Arunima Sama",
+      "unit_label": "MAL-11",
+      "property_name": "Padmavati Enclave",
+      "property_id": 2,
+      "occupation_type": "business",
+      "preferred_language": "hinglish",
+      "preferred_channel": "call",
+      "cycles": [
+        {
+          "cycle_month": "2026-07-01",
+          "due_date": "2026-07-05",
+          "status": "paid_on_time",
+          "paid_date": "2026-07-03",
+          "days_late": 0,
+          "amount": 12500,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-08-01",
+          "due_date": "2026-08-05",
+          "status": "paid_late",
+          "paid_date": "2026-08-11",
+          "days_late": 6,
+          "amount": 12500,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-09-01",
+          "due_date": "2026-09-05",
+          "status": "paid_late",
+          "paid_date": "2026-09-11",
+          "days_late": 6,
+          "amount": 12500,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-10-01",
+          "due_date": "2026-10-05",
+          "status": "open",
+          "paid_date": null,
+          "days_late": null,
+          "amount": 12500,
+          "probability": null,
+          "tier": null
+        }
+      ],
+      "current": {
+        "cycle_month": "2026-10-01",
+        "due_date": "2026-10-05",
+        "status": "open",
+        "paid_date": null,
+        "days_late": null,
+        "amount": 12500,
+        "probability": 0.75,
+        "tier": "high"
+      }
+    },
+    {
+      "lease_id": 36,
+      "tenant_name": "Girik Keer",
+      "unit_label": "MAL-03",
+      "property_name": "Padmavati Enclave",
+      "property_id": 2,
+      "occupation_type": "business",
+      "preferred_language": "hinglish",
+      "preferred_channel": "sms",
+      "cycles": [
+        {
+          "cycle_month": "2026-07-01",
+          "due_date": "2026-07-01",
+          "status": "paid_on_time",
+          "paid_date": "2026-07-01",
+          "days_late": 0,
+          "amount": 26500,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-08-01",
+          "due_date": "2026-08-01",
+          "status": "paid_late",
+          "paid_date": "2026-08-07",
+          "days_late": 6,
+          "amount": 26500,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-09-01",
+          "due_date": "2026-09-01",
+          "status": "paid_late",
+          "paid_date": "2026-09-10",
+          "days_late": 9,
+          "amount": 26500,
+          "probability": null,
+          "tier": null
+        },
+        {
+          "cycle_month": "2026-10-01",
+          "due_date": "2026-10-01",
+          "status": "open",
+          "paid_date": null,
+          "days_late": null,
+          "amount": 26500,
+          "probability": null,
+          "tier": null
+        }
+      ],
+      "current": {
+        "cycle_month": "2026-10-01",
+        "due_date": "2026-10-01",
+        "status": "open",
+        "paid_date": null,
+        "days_late": null,
+        "amount": 26500,
+        "probability": 0.75,
+        "tier": "high"
+      }
+    }
   ]
 }

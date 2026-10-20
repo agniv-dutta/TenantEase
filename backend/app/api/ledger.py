@@ -33,7 +33,7 @@ def ledger(
             detail={"code": "invalid_months", "message": "Months must be between 1 and 24."},
         )
     cycle = current_cycle(session)
-    closed_months = list(reversed(clock.recent_cycles(months)))[1:]  # oldest .. newest
+    closed_months = list(reversed(clock.recent_cycles(months + 1)[1 : months + 1]))  # closed months, oldest .. newest
     units = {u.id: u for u in session.exec(select(Unit)).all()}
     properties = {p.id: p for p in session.exec(select(Property)).all()}
     tenants = {t.id: t for t in session.exec(select(Tenant)).all()}

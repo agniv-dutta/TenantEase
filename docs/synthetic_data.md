@@ -11,7 +11,12 @@ run is byte-for-byte reproducible. **Nothing here describes real tenants.**
 - 1–3 BHK mix (35/45/20), rent correlated with BHK and a locality factor
   (C-Scheme highest, Jagatpura lowest), noise log-normal, clamped to
   6,000–35,000 INR and rounded to 500.
-- About 10% of units start vacant; overall occupancy sits near 88%.
+- About 10% of units start vacant, with deterministic vacancy gaps between
+  some tenancies and several units vacant for the full 24-month window. Current
+  unit status is derived from lease dates (`occupied`, `vacant`, or
+  `notice_given`); vacant units carry the date their current vacancy began.
+- A few current leases have a synthetic notice period ending after the demo
+  date. These units remain occupied in the ledger and occupancy count.
 - 24 fully closed monthly cycles ending at the last completed month, plus one
   open current cycle whose payment rows exist but have no `paid_date`.
 - About 15% of initial tenants churn mid-window; most re-let units get a new

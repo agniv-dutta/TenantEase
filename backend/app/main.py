@@ -12,7 +12,7 @@ from sqlmodel import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import clock
-from app.api import ledger, maintenance, model, portfolio, reminders, tenants
+from app.api import ledger, maintenance, model, payments, portfolio, reminders, tenants
 from app.config import settings
 from app.db import engine, init_db
 
@@ -123,4 +123,5 @@ app.include_router(ledger.router, prefix="/api", tags=["ledger"])
 app.include_router(tenants.router, prefix="/api/tenants", tags=["tenants"])
 app.include_router(reminders.router, prefix="/api/reminders", tags=["reminders"])
 app.include_router(maintenance.router, prefix="/api/maintenance", tags=["maintenance"])
+app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
 app.include_router(model.router, prefix="/api/model", tags=["model"])

@@ -213,3 +213,66 @@ class ModelCardResponse(BaseModel):
     metrics: dict[str, Any]
     slices: dict[str, Any]
     card_markdown: str
+
+
+class PaymentRecordRequest(BaseModel):
+    """Request body for recording a payment from a pasted message."""
+
+    lease_id: int
+    cycle_month: date
+    amount: int
+    paid_date: date
+    method: str  # upi | cash | bank_transfer | cheque
+    reference: str | None = None
+
+
+class PaymentRecordResponse(BaseModel):
+    """Result of recording a payment: what changed and the fresh cell."""
+
+    lease_id: int
+    cycle_month: date
+    amount: int
+    paid_date: date
+    method: str
+    reference: str | None = None
+    days_late: int
+    status: str
+    rescored: int
+    flags: list[str] = Field(default_factory=list)
+
+
+class ParsedFields(BaseModel):
+    """Structured fields pulled from a pasted message."""
+
+    payer_name_guess: str | None = None
+    amount: int | None = None
+    paid_date: date | None = None
+    method: str | None = None
+    reference: str | None = None
+    language: str
+    confidence: float
+
+
+class PaymentMatch(BaseModel):
+    """One candidate lease for a parsed payment."""
+
+    lease_id: int
+    tenant: str
+    unit: str
+    cycle_month: date | None = None
+    score: float
+    reasons: list[str] = Field(default_factory=list)
+
+
+class PaymentParseRequest(BaseModel):
+    """Request body for parsing a pasted payment message."""
+
+    text: str
+
+
+class PaymentParseResponse(BaseModel):
+    """Parsed fields, candidate leases and flags for one message."""
+
+    fields: ParsedFields
+    matches: list[PaymentMatch]
+    flags: list[str]

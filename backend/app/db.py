@@ -19,6 +19,19 @@ def init_db() -> None:
 
     SQLModel.metadata.create_all(engine)
     _ensure_risk_score_columns()
+    _ensure_unit_columns()
+
+
+def _ensure_unit_columns() -> None:
+    """Add unit vacancy fields to databases created by earlier demo versions."""
+    if not str(engine.url).startswith("sqlite"):
+        return
+    columns = {col["name"] for col in inspect(engine).get_columns("units")}
+    with engine.begin() as conn:
+        if "status" not in columns:
+            conn.execute(text("ALTER TABLE units ADD COLUMN status VARCHAR NOT NULL DEFAULT 'occupied'"))
+        if "vacant_since" not in columns:
+            conn.execute(text("ALTER TABLE units ADD COLUMN vacant_since DATE"))
 
 
 def _ensure_risk_score_columns() -> None:

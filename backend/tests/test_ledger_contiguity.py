@@ -33,9 +33,10 @@ def _month_index(iso: str) -> int:
 def _expected_closed_months(months: int) -> list[str]:
     """The ``months`` closed cycles immediately before the open cycle."""
     open_cycle = clock.open_cycle()
+    open_index = open_cycle.year * 12 + open_cycle.month - 1
     out: list[str] = []
     for offset in range(months, 0, -1):
-        index = open_cycle.year * 12 + open_cycle.month - 1 - offset
+        index = open_index - offset
         out.append(f"{index // 12:04d}-{index % 12 + 1:02d}-01")
     return out
 
